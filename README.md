@@ -39,8 +39,9 @@ He also does things on his own:
 - dances
 - takes coffee breaks
 - thinks hard
-- jumps onto the top of your windows and rides along when you move them
-- shoots tiny pixel pellets at your cursor ("gotcha!" / "dang it!")
+- spots any window he can reach, runs over and jumps onto it, then rides along when you move it
+- shoots tiny pixel pellets at your cursor, aiming in every direction ("gotcha!" / "dang it!")
+- pulls off trickshots: 360 no-scopes, no-look shots and ricochets off the floor ("TRICKSHOT!!")
 - smashes his laptop ("fixed it.")
 
 He doesn't show up in the taskbar or in Alt+Tab.

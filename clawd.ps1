@@ -121,6 +121,25 @@ public static class ClawdNative {
         }
         return IntPtr.Zero;
     }
+    // any window top on this screen he could climb: returns { hwnd, x } (x = visible spot on its top edge
+    // closest to him), or null. Topmost windows win.
+    public static long[] FindClimbTarget(IntPtr self, int nearX, int left, int right, int minTop, int maxTop, int margin) {
+        for (IntPtr h = GetTopWindow(IntPtr.Zero); h != IntPtr.Zero; h = GetWindow(h, 2)) {
+            if (!Usable(h, self)) continue;
+            RECT r = R(h);
+            if (r.Top < minTop || r.Top > maxTop) continue;
+            int a = Math.Max(r.Left + margin, left), b = Math.Min(r.Right - margin, right);
+            if (b <= a) continue;
+            int best = int.MinValue;
+            for (int i = 0; i < 12; i++) {
+                int x = a + (b - a) * i / 11;
+                if (!TopVisible(h, self, x, r.Top)) continue;
+                if (best == int.MinValue || Math.Abs(x - nearX) < Math.Abs(best - nearX)) best = x;
+            }
+            if (best != int.MinValue) return new long[] { h.ToInt64(), best };
+        }
+        return null;
+    }
 }
 "@
 
@@ -172,6 +191,56 @@ public static class ClawdCloud {
             }
         }
         return bmp;
+    }
+}
+
+// smooth rotation of chunky pixel art: every screen pixel is mapped back to a sprite pixel (nearest
+// neighbour, no blending, so the transparency key colour never bleeds)
+public static class ClawdSprite {
+    static int[] Read(Bitmap bmp, out System.Drawing.Imaging.BitmapData bd) {
+        bd = bmp.LockBits(new Rectangle(0, 0, bmp.Width, bmp.Height), System.Drawing.Imaging.ImageLockMode.ReadWrite,
+                          System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        int[] px = new int[bmp.Width * bmp.Height];
+        System.Runtime.InteropServices.Marshal.Copy(bd.Scan0, px, 0, px.Length);
+        return px;
+    }
+    static void Write(Bitmap bmp, System.Drawing.Imaging.BitmapData bd, int[] px) {
+        System.Runtime.InteropServices.Marshal.Copy(px, 0, bd.Scan0, px.Length);
+        bmp.UnlockBits(bd);
+    }
+    // draw a char-map sprite (1 char = 1 cell) rotated by deg around its pivot; the pivot lands at (atX, atY) cells
+    public static void DrawRotated(Bitmap bmp, string[] rows, string keys, int[] argb, double pivX, double pivY,
+                                   double atX, double atY, double deg, bool flipY, int cell) {
+        int h = rows.Length, w = rows[0].Length, W = bmp.Width, H = bmp.Height;
+        double a = deg * Math.PI / 180, c = Math.Cos(a), s = Math.Sin(a);
+        int rad = (int)Math.Ceiling(Math.Sqrt(w * w + h * h) * cell) + cell;
+        int cxp = (int)(atX * cell), cyp = (int)(atY * cell);
+        System.Drawing.Imaging.BitmapData bd; int[] px = Read(bmp, out bd);
+        for (int Y = Math.Max(0, cyp - rad); Y < Math.Min(H, cyp + rad); Y++)
+            for (int X = Math.Max(0, cxp - rad); X < Math.Min(W, cxp + rad); X++) {
+                double dx = (X + 0.5) / cell - atX, dy = (Y + 0.5) / cell - atY;
+                double sx = c * dx + s * dy, sy = -s * dx + c * dy;
+                if (flipY) sy = -sy;
+                int ix = (int)Math.Floor(sx + pivX), iy = (int)Math.Floor(sy + pivY);
+                if (ix < 0 || iy < 0 || ix >= w || iy >= h) continue;
+                int k = keys.IndexOf(rows[iy][ix]);
+                if (k >= 0) px[Y * W + X] = argb[k];
+            }
+        Write(bmp, bd, px);
+    }
+    // rotate everything already drawn on the canvas around (cx, cy) cells
+    public static void RotateCells(Bitmap bmp, int cell, double cx, double cy, double deg, Color key) {
+        int W = bmp.Width, H = bmp.Height, keyArgb = key.ToArgb();
+        double a = deg * Math.PI / 180, c = Math.Cos(a), s = Math.Sin(a);
+        double ox = cx * cell, oy = cy * cell;
+        System.Drawing.Imaging.BitmapData bd; int[] src = Read(bmp, out bd);
+        int[] dst = new int[src.Length];
+        for (int Y = 0; Y < H; Y++) for (int X = 0; X < W; X++) {
+            double dx = X + 0.5 - ox, dy = Y + 0.5 - oy;
+            int ix = (int)Math.Floor(c * dx + s * dy + ox), iy = (int)Math.Floor(-s * dx + c * dy + oy);
+            dst[Y * W + X] = (ix < 0 || iy < 0 || ix >= W || iy >= H) ? keyArgb : src[iy * W + ix];
+        }
+        Write(bmp, bd, dst);
     }
 }
 "@
@@ -239,6 +308,13 @@ $bPurple  = New-Brush 160 120 255
 $bTeal    = New-Brush 50 195 175
 $bGun     = New-Brush 132 138 150
 $bGrip    = New-Brush 96 62 40
+$bGunHi   = New-Brush 205 210 220
+# pistol pointing right; pivot (hand) at grip centre (2, 4.5), muzzle tip at (11, 2)
+$gunRows   = @('oooooooooo...', 'ohhhhhhhhho..', 'ogggggggggo..', 'obbgoooooo...', 'obbo.........', 'obbo.........', 'oooo.........')
+$flashRows = @('............f..', '...........fff.', '..........fwwff', '...........fff.', '............f..', '...............', '...............')
+$gunPal    = [int[]]@($bOutline.Color.ToArgb(), $bGunHi.Color.ToArgb(), $bGun.Color.ToArgb(), $bGrip.Color.ToArgb())
+$flashPal  = [int[]]@($bSpark.Color.ToArgb(), $bWhite.Color.ToArgb())
+$ARM = 6.0
 # movie night: his back in the dark, rim-lit by whatever is on screen
 $bBack        = New-Brush 88 44 33
 $bKernel      = New-Brush 250 238 195
@@ -413,6 +489,7 @@ $st = @{
     keyCount = 0.0; lastKeyTick = -10000; typeHand = $false
     back = $false; rim = $rimSet[0]; rimEvery = 40; videoSeen = -10000; videoRect = $null
     videoTitle = ''; media = 'none'; pausedPolls = 0; nextComment = 200; resumed = $false; laughT = 0; watchX = 0.0
+    aimDeg = 0.0; aimSide = 1; rot = 0; jy = 0.0; jv = 0.0; air = $false; trick = 'noscope'; climbX = 0.0; climbCD = 150
 }
 
 function Set-Mode([string]$m, [int]$timer = 0) { $st.mode = $m; $st.timer = $timer; $st.t = 0; $st.hover = 0 }
@@ -445,13 +522,48 @@ function Spawn-Debris {
     }
 }
 
-# Is there a window whose top edge he can jump onto? Crouch first, then jump.
+# Any window top on this screen he can reach? He runs over to it, crouches and jumps up.
 function Try-Climb($w, $h, $wa) {
     $cx = [int]($st.x + $w / 2); $feet = [int]($st.y + $h)
-    $hw = [ClawdNative]::FindTop($self, $cx, 40, $wa.Top + 60, $feet - 40)
-    if ($hw -eq [IntPtr]::Zero) { return $false }
-    Set-Mode 'crouch'; $st.target = $hw
+    $res = [ClawdNative]::FindClimbTarget($self, $cx, $wa.Left + 60, $wa.Right - 60, $wa.Top + 60, $feet - 60, 110)
+    if ($null -eq $res) { return $false }
+    $st.target = [IntPtr]([long]$res[0]); $st.climbX = [double]$res[1]
+    Set-Mode 'goclimb'
     return $true
+}
+
+# ---- aiming: one arm + the pistol rotate toward a point ----
+function Get-Aim($ox, $oy) {
+    $left = $st.aimSide -lt 0
+    $shx = if ($left) { $ox + 3 } else { $ox + 19 }; $shy = $oy + 7
+    $a = $st.aimDeg * [Math]::PI / 180; $c = [Math]::Cos($a); $s = [Math]::Sin($a)
+    @{ left = $left; shx = $shx; shy = $shy; c = $c; s = $s; hx = $shx + $c * $ARM; hy = $shy + $s * $ARM }
+}
+function Aim-At([double]$tx, [double]$ty) {
+    $side = if ($tx -ge $st.x + ($OX + 11) * $S) { 1 } else { -1 }
+    $st.aimSide = $side
+    $shx = $st.x + $(if ($side -lt 0) { $OX + 3 } else { $OX + 19 }) * $S
+    $shy = $st.y + ($OY + 7) * $S
+    $deg = [Math]::Atan2($ty - $shy, $tx - $shx) * 180 / [Math]::PI
+    # work in "right-hand" angles so both sides share one clamp (no aiming through his own body)
+    $m = if ($side -gt 0) { $deg } else { 180 - $deg }
+    while ($m -gt 180) { $m -= 360 }; while ($m -le -180) { $m += 360 }
+    $m = [Math]::Max(-115, [Math]::Min(40, $m))
+    $st.aimDeg = if ($side -gt 0) { $m } else { 180 - $m }
+    $st.eye = $side; $st.arms = 'aim'; $st.gun = 1
+}
+# muzzle tip in screen pixels (+ the hand in canvas cells, for shell casings)
+function Get-Muzzle {
+    $ag = Get-Aim $OX $OY
+    $mv = if ($ag.left) { 2.5 } else { -2.5 }
+    $mx = $ag.hx + $ag.c * 9 - $ag.s * $mv; $my = $ag.hy + $ag.s * 9 + $ag.c * $mv
+    @(($st.x + $mx * $S), ($st.y + $my * $S), $ag.hx, $ag.hy)
+}
+function Fire-Gun($target, $via = $null) {
+    $mz = Get-Muzzle
+    Fire-Bullet $mz[0] $mz[1] $target $via
+    $st.flash = 3; $st.recoil = 3
+    [void]$parts.Add(@{ kind = 'spark'; x = [double]$mz[2]; y = [double]$mz[3] - 1; vx = -0.5 * $st.aimSide; vy = -1.6; b = $bSpark; sz = 1; life = 22 })
 }
 
 function Get-Ground($w, $h, $wa) {
@@ -479,8 +591,9 @@ function Pick-Activity($w, $h, $wa) {
     elseif ($r -lt 18) { Set-Mode 'coffee' }
     elseif ($r -lt 27) { Set-Mode 'think'; $st.word = $thinkWords[$rng.Next($thinkWords.Count)] }
     elseif ($r -lt 32) { Start-Smash }
-    elseif ($r -lt 37) { Set-Mode 'gun' }
-    elseif ($r -lt 49 -and (Try-Climb $w $h $wa)) { }
+    elseif ($r -lt 35) { Set-Mode 'gun' }
+    elseif ($r -lt 40) { Set-Mode 'trick' }
+    elseif ($r -lt 52 -and (Try-Climb $w $h $wa)) { }
     else {
         if ($rng.Next(3) -eq 0) { $st.dir = -$st.dir }
         Set-Mode 'walk'
@@ -538,6 +651,11 @@ function Render-Frame {
         'wave1' { Add-O $ox ($oy + 6) 4 2;        Add-O ($ox + 18) ($oy - 3) 2 10 }
         'wave2' { Add-O $ox ($oy + 6) 4 2;        Add-O ($ox + 18) ($oy + 3) 2 4; Add-O ($ox + 20) ($oy - 2) 2 6 }
         'sip'   { Add-O $ox ($oy + 6) 4 2;        Add-O ($ox + 18) ($oy + 8) 3 2 }
+        'aim'   {
+            $ag = Get-Aim $ox $oy
+            if ($ag.left) { Add-O ($ox + 18) ($oy + 6) 4 2 } else { Add-O $ox ($oy + 6) 4 2 }
+            for ($sd = 0.0; $sd -le $ARM; $sd += 0.5) { Add-O ($ag.shx + $ag.c * $sd - 1) ($ag.shy + $ag.s * $sd - 1) 2 2 }
+        }
     }
     $legs = @()
     foreach ($c in 4, 8, 12, 16) {
@@ -616,18 +734,13 @@ function Render-Frame {
         }
     }
     if ($st.gun -ne 0) {
-        $rc = if ($st.recoil -gt 0) { 1 } else { 0 }
-        if ($st.gun -gt 0) {
-            $gx = $ox + 21 - $rc
-            Px ($gx - 1) ($oy + 3) 8 4 $bOutline; Px ($gx - 1) ($oy + 5) 4 5 $bOutline
-            Px $gx ($oy + 4) 6 2 $bGun; Px $gx ($oy + 6) 2 3 $bGrip; Px ($gx + 4) ($oy + 4) 1 1 $bWhite
-            if ($st.flash -gt 0) { Px ($gx + 7) ($oy + 3) 2 4 $bSpark; Px ($gx + 9) ($oy + 4) 1 2 $bWhite }
-        } else {
-            $gx = $ox - 6 + $rc
-            Px ($gx - 1) ($oy + 3) 8 4 $bOutline; Px ($gx + 3) ($oy + 5) 4 5 $bOutline
-            Px $gx ($oy + 4) 6 2 $bGun; Px ($gx + 4) ($oy + 6) 2 3 $bGrip; Px ($gx + 1) ($oy + 4) 1 1 $bWhite
-            if ($st.flash -gt 0) { Px ($gx - 3) ($oy + 3) 2 4 $bSpark; Px ($gx - 4) ($oy + 4) 1 2 $bWhite }
-        }
+        # pistol in his hand, rotated to wherever he's aiming (kicks back a cell on recoil)
+        $ag = Get-Aim $ox $oy
+        $rb = if ($st.recoil -gt 0) { 1.0 } else { 0.0 }
+        $hx = $ag.hx - $ag.c * $rb; $hy = $ag.hy - $ag.s * $rb
+        $g.Flush()
+        [ClawdSprite]::DrawRotated($canvas, $gunRows, 'ohgb', $gunPal, 2.0, 4.5, $hx, $hy, $st.aimDeg, $ag.left, $S)
+        if ($st.flash -gt 0) { [ClawdSprite]::DrawRotated($canvas, $flashRows, 'fw', $flashPal, 2.0, 4.5, $hx, $hy, $st.aimDeg, $ag.left, $S) }
     }
     if ($st.bang) { Px ($ox + 10) ($oy - 12) 2 4 $bRed; Px ($ox + 10) ($oy - 7) 2 2 $bRed }
     if ($st.mode -eq 'dizzy') {
@@ -636,6 +749,9 @@ function Render-Frame {
             Glyph 'star' ([int][Math]::Floor($ox + 10 + [Math]::Cos($a) * 10) * $S) ([int][Math]::Floor($oy - 3 + [Math]::Sin($a) * 2) * $S) $S $bSpark
         }
     }
+
+    # ---- spinning (trickshots): rotate everything drawn so far, on the pixel grid ----
+    if ($st.rot -ne 0) { $g.Flush(); [ClawdSprite]::RotateCells($canvas, $S, $ox + 11, $oy + 8, $st.rot, $keyCol) }
 
     # ---- particles ----
     foreach ($p in $parts) {
@@ -740,10 +856,11 @@ $menuItems = @(
     @{ text = 'Think hard';       act = { Set-Mode 'think'; $st.word = $thinkWords[$rng.Next($thinkWords.Count)] } }
     @{ text = 'Climb a window';   act = {
         $wa = [System.Windows.Forms.Screen]::FromControl($form).WorkingArea
-        if (-not (Try-Climb $form.Width $form.Height $wa)) { Say 'no window above me!' 60 }
+        if (-not (Try-Climb $form.Width $form.Height $wa)) { Say 'no window to climb!' 60 }
     } }
     @{ text = 'Smash the laptop'; act = { Start-Smash } }
     @{ text = 'Shoot my cursor';  act = { Set-Mode 'gun' } }
+    @{ text = 'Trickshot!';       act = { Set-Mode 'trick' } }
     @{ text = '-' }
     @{ text = 'startup';          act = { Set-Startup (-not (Test-Path $startupLnk)) } }
     @{ text = '-' }
@@ -885,13 +1002,17 @@ function Move-Bullet($bl) {
     $half = [int]($BC * $S / 2)
     $bl.form.Location = New-Object System.Drawing.Point ([int]$bl.x - $half), ([int]$bl.y - $half)
 }
-function Fire-Bullet([double]$sx, [double]$sy, $target) {
+function Aim-Bullet($bl, $tx, $ty) {
+    $dx = $tx - $bl.x; $dy = $ty - $bl.y
+    $steps = [int][Math]::Max(1, [Math]::Ceiling([Math]::Sqrt($dx * $dx + $dy * $dy) / (32 * $k)))
+    $bl.tx = $tx; $bl.ty = $ty; $bl.vx = $dx / $steps; $bl.vy = $dy / $steps; $bl.left = $steps
+}
+# $via: optional bounce point (ricochet) before heading for the target
+function Fire-Bullet([double]$sx, [double]$sy, $target, $via = $null) {
     foreach ($bl in $bullets) {
         if (-not $bl.active) {
-            $dx = $target.X - $sx; $dy = $target.Y - $sy
-            $steps = [int][Math]::Max(1, [Math]::Ceiling([Math]::Sqrt($dx * $dx + $dy * $dy) / (32 * $k)))
-            $bl.x = $sx; $bl.y = $sy; $bl.tx = $target.X; $bl.ty = $target.Y
-            $bl.vx = $dx / $steps; $bl.vy = $dy / $steps; $bl.left = $steps; $bl.impact = 0
+            $bl.x = $sx; $bl.y = $sy; $bl.impact = 0
+            if ($via) { Aim-Bullet $bl $via.X $via.Y; $bl.next = $target } else { Aim-Bullet $bl $target.X $target.Y; $bl.next = $null }
             $bl.pb.Image = $bulletBmp
             Move-Bullet $bl
             [ClawdNative]::ShowNoActivate($bl.form.Handle)
@@ -908,7 +1029,12 @@ function Update-Bullets($cur) {
             if ($bl.impact -le 0) { [ClawdNative]::HideWin($bl.form.Handle); $bl.active = $false }
         } else {
             $bl.x += $bl.vx; $bl.y += $bl.vy; $bl.left--
-            if ($bl.left -le 0) {
+            if ($bl.left -le 0 -and $bl.next) {
+                # ricochet: bounce off and head for the real target
+                $bl.x = [double]$bl.tx; $bl.y = [double]$bl.ty
+                $nx = $bl.next; $bl.next = $null
+                Aim-Bullet $bl $nx.X $nx.Y
+            } elseif ($bl.left -le 0) {
                 $bl.x = [double]$bl.tx; $bl.y = [double]$bl.ty
                 $bl.pb.Image = $impactBmp; $bl.impact = 9
                 $hx = $cur.X - $bl.tx; $hy = $cur.Y - $bl.ty
@@ -987,7 +1113,7 @@ $timer.Add_Tick({
 
     # per-frame visual defaults
     $st.arms = 'out'; $st.eyeStyle = 'normal'; $st.mouth = 'none'; $st.blush = $false; $st.sit = $false
-    $st.wob = 0; $st.mug = 'none'; $st.laptop = 'none'; $st.bang = $false; $st.spin = $false; $st.gun = 0; $st.back = $false
+    $st.wob = 0; $st.mug = 'none'; $st.laptop = 'none'; $st.bang = $false; $st.spin = $false; $st.gun = 0; $st.back = $false; $st.rot = 0
 
     if ($st.tick % 10 -eq 0) { $st.idleMs = [ClawdNative]::IdleMs() }
     if ($st.blink -gt 0) { $st.blink-- }
@@ -1061,7 +1187,12 @@ $timer.Add_Tick({
 
         # you're typing -> he gets his laptop out and types along
         $canType = $free -or $st.mode -eq 'wave' -or $st.mode -eq 'think' -or $st.mode -eq 'dance' -or $st.mode -eq 'coffee'
-        if ($canType -and $st.keyCount -ge 3) { Set-Mode 'typing' }
+        if ($canType -and $st.keyCount -ge 3) { Set-Mode 'typing'; $free = $false }
+
+        # windows are for climbing! (looks around every ~2 s while he's free)
+        if ($free -and $st.mode -ne 'chase' -and $st.tick % 60 -eq 30 -and $st.tick -gt $st.climbCD) {
+            if (Try-Climb $w $h $wa) { $free = $false }
+        }
 
         switch ($st.mode) {
             'fall' {
@@ -1077,6 +1208,7 @@ $timer.Add_Tick({
                     if ($hw -ne [IntPtr]::Zero) {
                         $r = [ClawdNative]::Rect($hw)
                         $st.y = [double]($r[1] - $h); $st.plat = $hw; $st.platRect = $r; $landed = $true
+                        $st.climbCD = $st.tick + 900          # enjoy this window for a bit before eyeing the next one
                     } elseif ($st.y -ge $ground) { $st.y = $ground; $landed = $true }
                     if ($landed) {
                         if ($st.vy -gt 8 * $k) { $st.squash = 6 }
@@ -1098,7 +1230,7 @@ $timer.Add_Tick({
                 if ($st.platRect -and -not $st.walkOff) {
                     $r = $st.platRect
                     if (($st.dir -lt 0 -and $cxw -lt $r[0] + 15) -or ($st.dir -gt 0 -and $cxw -gt $r[2] - 15)) {
-                        if ($rng.Next(3) -eq 0) { $st.walkOff = $true } else { $st.dir = -$st.dir }
+                        if ($rng.Next(5) -eq 0) { $st.walkOff = $true } else { $st.dir = -$st.dir }
                     }
                 }
                 if ($rng.Next(300) -eq 0) { Set-Mode 'idle' (40 + $rng.Next(160)) }
@@ -1132,6 +1264,7 @@ $timer.Add_Tick({
                         $r = [ClawdNative]::Rect($st.target)
                         $dy = ($st.y + $h) - $r[1]
                         if ($dy -gt 0) {
+                            $st.climbCD = $st.tick + 240
                             Leave-Platform; Set-Mode 'fall'
                             $st.vy = -([Math]::Sqrt(2 * $GRAV * $dy) + 2 * $k); $st.vx = 0.0
                         } else { Set-Mode 'idle' 20 }
@@ -1216,23 +1349,78 @@ $timer.Add_Tick({
                     Set-Mode 'idle' 30   # laptop away
                 }
             }
+            'goclimb' {
+                $st.y = $ground
+                if (-not [ClawdNative]::Usable($st.target, $self) -or $st.t -gt 600) { $st.climbCD = $st.tick + 300; Set-Mode 'idle' 30 }
+                else {
+                    if ($st.t -eq 1) { $l = @('ooh, a window!', 'up there!', 'I can make that', 'climb time!'); Say $l[$rng.Next($l.Count)] 45 }
+                    $dx = $st.climbX - $cxw
+                    if ([Math]::Abs($dx) -gt 6 * $k) {
+                        $st.dir = if ($dx -gt 0) { 1 } else { -1 }
+                        $st.x += 2.8 * $k * $st.dir; $st.eye = $st.dir; $st.eyeStyle = 'up'
+                        if ($st.tick % 3 -eq 0) { $st.phase = ($st.phase + 1) % 4 }
+                    } else { Set-Mode 'crouch' }
+                }
+            }
             'gun' {
-                $st.y = $ground; $st.phase = 0
-                $st.dir = if ($cdx -ge 0) { 1 } else { -1 }
-                $st.eye = $st.dir; $st.gun = $st.dir
-                $t = $st.t
-                if ($t -eq 1) { Say 'hold still...' 45; $st.hits = 0 }
-                if ($t -lt 140) { $st.eyeStyle = 'angry' }
+                $st.y = $ground; $st.phase = 0; $t = $st.t
+                if ($t -lt 140) { Aim-At $cur.X $cur.Y; $st.eyeStyle = 'angry' }
                 elseif ($st.hits -gt 0) { $st.eyeStyle = 'happy'; $st.mouth = 'smile' }
                 else { $st.mouth = 'o' }
-                if ($t -ge 30 -and $t -le 102 -and ($t - 30) % 18 -eq 0) {
-                    $mxc = if ($st.dir -gt 0) { $OX + 29 } else { $OX - 8 }
-                    Fire-Bullet ($st.x + $mxc * $S) ($st.y + ($OY + 5) * $S) $cur
-                    $st.flash = 3; $st.recoil = 3
-                    [void]$parts.Add(@{ kind = 'spark'; x = [double]($OX + 11 + 11 * $st.dir); y = [double]($OY + 4); vx = -0.6 * $st.dir; vy = -1.6; b = $bSpark; sz = 1; life = 22 })
-                }
+                if ($t -eq 1) { Say 'hold still...' 45; $st.hits = 0 }
+                if ($t -ge 30 -and $t -le 102 -and ($t - 30) % 18 -eq 0) { Fire-Gun $cur }
                 if ($t -eq 140) { if ($st.hits -gt 0) { Say 'gotcha!' 50 } else { Say 'dang it!' 50 } }
                 if ($t -ge 180) { Set-Mode 'idle' 30 }
+            }
+            'trick' {
+                $t = $st.t; $st.phase = 0; $resultT = 110
+                if ($t -eq 1) {
+                    $st.trick = @('noscope', 'noscope', 'nolook', 'ricochet')[$rng.Next(4)]
+                    $st.hits = 0; $st.jy = 0.0; $st.jv = 0.0; $st.air = $false
+                    switch ($st.trick) {
+                        'noscope'  { Say '360 no-scope. watch.' 50 }
+                        'nolook'   { Say "don't even need to look" 50 }
+                        'ricochet' { Say 'bank shot. watch this.' 50 }
+                    }
+                }
+                if ($t -lt $resultT) {
+                    switch ($st.trick) {
+                        'noscope' {
+                            # crouch, jump, full spin in the air, fire at the top
+                            if ($t -lt 22) { $st.sit = $true; $st.eyeStyle = 'happy' }
+                            if ($t -eq 22) { $st.jv = 15 * $k; $st.air = $true }
+                            if ($st.air) {
+                                $st.jy += $st.jv; $st.jv -= $GRAV
+                                if ($st.jy -le 0) { $st.jy = 0.0; $st.air = $false; $st.squash = 6 }
+                            }
+                            Aim-At $cur.X $cur.Y
+                            if ($t -ge 23 -and $t -lt 41) { $st.rot = ($t - 23) * 20; $st.eyeStyle = 'happy' }
+                            elseif ($t -ge 41) { $st.eyeStyle = 'angry' }
+                            if ($t -eq 41) { Fire-Gun $cur }
+                        }
+                        'nolook' {
+                            # eyes shut, smug, still on target
+                            Aim-At $cur.X $cur.Y; $st.eye = 0; $st.eyeStyle = 'sleep'; $st.mouth = 'smile'
+                            if ($t -eq 45) { Fire-Gun $cur }
+                        }
+                        'ricochet' {
+                            # shoot the floor halfway to the cursor; it bounces up into it
+                            $fx = ($cxw + $cur.X) / 2; $fy = $st.y + $h - 2
+                            Aim-At $fx $fy; $st.eyeStyle = 'angry'
+                            if ($t -eq 45) { Fire-Gun $cur (New-Object System.Drawing.Point ([int]$fx), ([int]$fy)) }
+                        }
+                    }
+                } elseif ($t -eq $resultT) {
+                    if ($st.hits -gt 0) {
+                        Say 'TRICKSHOT!!' 70
+                        for ($i = 0; $i -lt 6; $i++) { Spawn-Float 'star' ($OX + 4 + $rng.Next(14)) ($OY - 2 - $rng.Next(4)) (($rng.NextDouble() - 0.5) * 0.4) -0.3 35 $bSpark }
+                    } else { $l = @('meant to do that.', 'that counts.', 'wind, obviously.', 'lag.'); Say $l[$rng.Next($l.Count)] 60 }
+                } else {
+                    $st.eyeStyle = if ($st.hits -gt 0) { 'happy' } else { 'normal' }
+                    if ($st.hits -gt 0) { $st.mouth = 'smile' }
+                    if ($t -ge $resultT + 60) { Set-Mode 'idle' 30 }
+                }
+                $st.y = $ground - $st.jy
             }
             'wave' {
                 $st.y = $ground; $st.phase = 0; $st.eye = $lookEye
@@ -1416,7 +1604,7 @@ function Invoke-Demo([string]$outDir) {
     function Tick-Base {
         $st.tick++; $st.t++
         $st.arms = 'out'; $st.eyeStyle = 'normal'; $st.mouth = 'none'; $st.blush = $false; $st.sit = $false
-        $st.wob = 0; $st.mug = 'none'; $st.laptop = 'none'; $st.bang = $false; $st.spin = $false; $st.gun = 0; $st.back = $false
+        $st.wob = 0; $st.mug = 'none'; $st.laptop = 'none'; $st.bang = $false; $st.spin = $false; $st.gun = 0; $st.back = $false; $st.rot = 0
         if ($st.blink -gt 0) { $st.blink-- } else { $st.nextBlink--; if ($st.nextBlink -le 0) { $st.blink = 4; $st.nextBlink = 80 + $rng.Next(150) } }
         if ($st.sayT -gt 0) { $st.sayT-- }
         if ($st.squash -gt 0) { $st.squash-- }
@@ -1460,6 +1648,34 @@ function Invoke-Demo([string]$outDir) {
         Tick-Base; $st.eyeStyle = 'happy'; $st.mouth = 'smile'
         $beat = [int][Math]::Floor($st.t / 8); $st.sit = ($beat % 2 -eq 1); $st.arms = if ($beat % 2 -eq 0) { 'upL' } else { 'upR' }
         if ($st.t % 14 -eq 1) { Spawn-Float 'note' ($OX + 9 + $rng.Next(-10, 11)) ($OY - 4) (($rng.NextDouble() - 0.5) * 0.25) -0.3 45 $noteBrushes[$rng.Next($noteBrushes.Count)] }
+        Snap
+    }
+    # gun: aim sweeps from straight up, round to the front and down, shooting (no real bullets in the demo)
+    Set-Mode 'gun'; Say 'hold still...' 45
+    for ($i = 0; $i -lt 96; $i++) {
+        Tick-Base; if ($st.flash -gt 0) { $st.flash-- }; if ($st.recoil -gt 0) { $st.recoil-- }
+        $st.gun = 1; $st.arms = 'aim'; $st.aimSide = 1; $st.eye = 1; $st.eyeStyle = 'angry'
+        $st.aimDeg = -105 + $i * 1.45
+        if ($i % 16 -eq 8) { $st.flash = 3; $st.recoil = 3 }
+        Snap
+    }
+    # ...other side, then a 360 spin shot
+    for ($i = 0; $i -lt 40; $i++) {
+        Tick-Base; if ($st.flash -gt 0) { $st.flash-- }; if ($st.recoil -gt 0) { $st.recoil-- }
+        $st.gun = 1; $st.arms = 'aim'; $st.aimSide = -1; $st.eye = -1; $st.eyeStyle = 'angry'
+        $st.aimDeg = 180 + 30 - $i * 1.5
+        if ($i % 16 -eq 8) { $st.flash = 3; $st.recoil = 3 }
+        Snap
+    }
+    Set-Mode 'trick'; Say '360 no-scope. watch.' 45
+    for ($i = 0; $i -lt 70; $i++) {
+        Tick-Base; if ($st.flash -gt 0) { $st.flash-- }; if ($st.recoil -gt 0) { $st.recoil-- }
+        $st.gun = 1; $st.arms = 'aim'; $st.aimSide = 1; $st.eye = 1; $st.aimDeg = -20
+        if ($i -lt 14) { $st.sit = $true; $st.eyeStyle = 'happy' }
+        elseif ($i -lt 32) { $st.rot = ($i - 14) * 20; $st.eyeStyle = 'happy' }
+        else { $st.eyeStyle = 'angry' }
+        if ($i -eq 32) { $st.flash = 4; $st.recoil = 3 }
+        if ($i -eq 44) { Say 'TRICKSHOT!!' 40; for ($j = 0; $j -lt 6; $j++) { Spawn-Float 'star' ($OX + 4 + $rng.Next(14)) ($OY - 2 - $rng.Next(4)) (($rng.NextDouble() - 0.5) * 0.4) -0.3 35 $bSpark } }
         Snap
     }
     # laptop smash
