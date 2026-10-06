@@ -309,6 +309,14 @@ $bTeal    = New-Brush 50 195 175
 $bGun     = New-Brush 132 138 150
 $bGrip    = New-Brush 96 62 40
 $bGunHi   = New-Brush 205 210 220
+# web-slinger suit
+$bSuitRed   = New-Brush 200 32 42
+$bSuitLight = New-Brush 232 82 88
+$bSuitBlue  = New-Brush 36 76 186
+$bWebLine   = New-Brush 118 16 26
+$bKey       = New-Object System.Drawing.SolidBrush $keyCol
+$penWebOut  = New-Object System.Drawing.Pen ([System.Drawing.Color]::FromArgb(140, 140, 155)), ([float](3 * $k))
+$penWeb     = New-Object System.Drawing.Pen ([System.Drawing.Color]::FromArgb(246, 246, 250)), ([float](1.5 * $k))
 # pistol pointing right; pivot (hand) at grip centre (2, 4.5), muzzle tip at (11, 2)
 $gunRows   = @('oooooooooo...', 'ohhhhhhhhho..', 'ogggggggggo..', 'obbgoooooo...', 'obbo.........', 'obbo.........', 'oooo.........')
 $flashRows = @('............f..', '...........fff.', '..........fwwff', '...........fff.', '............f..', '...............', '...............')
@@ -490,6 +498,8 @@ $st = @{
     back = $false; rim = $rimSet[0]; rimEvery = 40; videoSeen = -10000; videoRect = $null
     videoTitle = ''; media = 'none'; pausedPolls = 0; nextComment = 200; resumed = $false; laughT = 0; watchX = 0.0
     aimDeg = 0.0; aimSide = 1; rot = 0; jy = 0.0; jv = 0.0; air = $false; trick = 'noscope'; climbX = 0.0; climbCD = 150
+    suit = $false; px = 0.0; py = 0.0; pvx = 0.0; pvy = 0.0; anchor = 'none'; ax = 0.0; ay = 0.0
+    ropeL = 0.0; ropeTarget = 0.0; anchT = 0; freeT = 0; swings = 0; maxSwings = 5; travel = 1; flip = 0
 }
 
 function Set-Mode([string]$m, [int]$timer = 0) { $st.mode = $m; $st.timer = $timer; $st.t = 0; $st.hover = 0 }
@@ -593,7 +603,8 @@ function Pick-Activity($w, $h, $wa) {
     elseif ($r -lt 32) { Start-Smash }
     elseif ($r -lt 35) { Set-Mode 'gun' }
     elseif ($r -lt 40) { Set-Mode 'trick' }
-    elseif ($r -lt 52 -and (Try-Climb $w $h $wa)) { }
+    elseif ($r -lt 44) { Set-Mode 'suitup' }
+    elseif ($r -lt 56 -and (Try-Climb $w $h $wa)) { }
     else {
         if ($rng.Next(3) -eq 0) { $st.dir = -$st.dir }
         Set-Mode 'walk'
@@ -677,7 +688,25 @@ function Render-Frame {
     Px ($bx + $bw - 1) ($oy + 1) 1 11 $bShade
     foreach ($l in $legs) { Px ($l[0] + 1) ($oy + 12) 1 $l[1] $bShade }
 
+    if ($st.suit) {
+        # web-slinger suit: red top with web lines, blue bottom and legs, spider on the chest, big mask eyes
+        for ($qi = 1; $qi -lt $orangeList.Count; $qi++) { $q = $orangeList[$qi]; Px $q[0] $q[1] $q[2] $q[3] $bSuitRed }
+        Px $bx $oy $bw 8 $bSuitRed
+        Px $bx ($oy + 8) $bw 4 $bSuitBlue
+        foreach ($l in $legs) { Px $l[0] ($oy + 12) 2 $l[1] $bSuitBlue }
+        foreach ($wx in 3, 7, 10) { Px ($bx + $wx) ($oy + 1) 1 7 $bWebLine }
+        Px ($bx + 1) ($oy + 3) ($bw - 2) 1 $bWebLine; Px ($bx + 1) ($oy + 6) ($bw - 2) 1 $bWebLine
+        Px $bx $oy $bw 1 $bSuitLight; Px $bx ($oy + 1) 1 7 $bSuitLight
+        Px ($ox + 10) ($oy + 6) 2 2 $bEye
+        Px ($ox + 9) ($oy + 5) 1 1 $bEye; Px ($ox + 12) ($oy + 5) 1 1 $bEye; Px ($ox + 9) ($oy + 8) 1 1 $bEye; Px ($ox + 12) ($oy + 8) 1 1 $bEye
+        foreach ($mx in ($ox + 5), ($ox + 13)) {
+            Px $mx ($oy + 2) 4 4 $bEye
+            if ($st.blink -gt 0) { Px ($mx + 1) ($oy + 4) 2 1 $bWhite } else { Px ($mx + 1) ($oy + 3) 2 2 $bWhite; Px ($mx + 1) ($oy + 2) 2 1 $bEye }
+        }
+    }
+
     # ---- face ----
+    if (-not $st.suit) {
     $style = $st.eyeStyle
     if ($st.blink -gt 0 -and ($style -eq 'normal' -or $style -eq 'up' -or $style -eq 'down')) { $style = 'blink' }
     $ex1 = $ox + 6 + 2 * $e; $ex2 = $ox + 14 + 2 * $e
@@ -707,6 +736,8 @@ function Render-Frame {
         'smile' { Px ($ox + 9) ($oy + 7) 1 1 $bEye; Px ($ox + 10) ($oy + 8) 2 1 $bEye; Px ($ox + 12) ($oy + 7) 1 1 $bEye }
         'yawn'  { Px ($ox + 9) ($oy + 7) 4 3 $bEye; Px ($ox + 10) ($oy + 9) 2 1 $bTongue }
     }
+
+    }   # end of normal face
 
     # ---- props ----
     if ($st.mug -ne 'none') {
@@ -861,6 +892,7 @@ $menuItems = @(
     @{ text = 'Smash the laptop'; act = { Start-Smash } }
     @{ text = 'Shoot my cursor';  act = { Set-Mode 'gun' } }
     @{ text = 'Trickshot!';       act = { Set-Mode 'trick' } }
+    @{ text = 'Web-swing!';       act = { Set-Mode 'suitup' } }
     @{ text = '-' }
     @{ text = 'startup';          act = { Set-Startup (-not (Test-Path $startupLnk)) } }
     @{ text = '-' }
@@ -1045,6 +1077,80 @@ function Update-Bullets($cur) {
     }
 }
 
+# ---------- web-slinging: a screen-sized click-through overlay that only holds the web line ----------
+$webForm = New-Object System.Windows.Forms.Form
+$webForm.FormBorderStyle = 'None'; $webForm.ShowInTaskbar = $false; $webForm.TopMost = $true; $webForm.StartPosition = 'Manual'
+$webForm.BackColor = $keyCol; $webForm.TransparencyKey = $keyCol
+$webPb = New-Object System.Windows.Forms.PictureBox
+$webPb.Dock = 'Fill'; $webPb.BackColor = $keyCol
+$webForm.Controls.Add($webPb)
+[ClawdNative]::MakeOverlay($webForm.Handle)
+$web = @{ on = $false; bmp = $null; gr = $null; ox = 0; oy = 0; rect = $null }
+
+function Web-Begin($bounds) {
+    Web-End
+    $web.bmp = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height
+    $web.gr = [System.Drawing.Graphics]::FromImage($web.bmp); $web.gr.Clear($keyCol)
+    $web.ox = $bounds.X; $web.oy = $bounds.Y; $web.rect = $null
+    $webPb.Image = $web.bmp
+    $webForm.Bounds = $bounds
+    [ClawdNative]::ShowNoActivate($webForm.Handle)
+    $web.on = $true
+}
+# draw the web from (x1,y1) to the anchor (x2,y2), screen coords; with no args it just erases
+function Web-Draw($x1, $y1, $x2, $y2) {
+    if (-not $web.on) { return }
+    if ($web.rect) { $web.gr.FillRectangle($bKey, $web.rect); $webPb.Invalidate($web.rect) }
+    $web.rect = $null
+    if ($null -eq $x1) { return }
+    $a1 = [float]($x1 - $web.ox); $b1 = [float]($y1 - $web.oy); $a2 = [float]($x2 - $web.ox); $b2 = [float]($y2 - $web.oy)
+    $web.gr.DrawLine($penWebOut, $a1, $b1, $a2, $b2)
+    $web.gr.DrawLine($penWeb, $a1, $b1, $a2, $b2)
+    # little splat where it sticks
+    $sp = [float](5 * $k)
+    $web.gr.DrawLine($penWeb, $a2 - $sp, $b2 - $sp, $a2 + $sp, $b2 + $sp); $web.gr.DrawLine($penWeb, $a2 - $sp, $b2 + $sp, $a2 + $sp, $b2 - $sp)
+    $pad = [int](10 * $k)
+    $web.rect = New-Object System.Drawing.Rectangle ([int][Math]::Min($a1, $a2) - $pad), ([int][Math]::Min($b1, $b2) - $pad), ([int][Math]::Abs($a2 - $a1) + 2 * $pad), ([int][Math]::Abs($b2 - $b1) + 2 * $pad)
+    $webPb.Invalidate($web.rect)
+}
+function Web-End {
+    if ($web.on) { [ClawdNative]::HideWin($webForm.Handle) }
+    $web.on = $false
+    if ($web.gr) { $web.gr.Dispose(); $web.gr = $null }
+    if ($web.bmp) { $webPb.Image = $null; $web.bmp.Dispose(); $web.bmp = $null }
+}
+# pick what to shoot the next web at: your cursor (if it's above him), a side wall he's close to, or the top of the screen ahead
+function New-Anchor($wa, $cur) {
+    $dir = $st.travel
+    $cdx2 = $cur.X - $st.px
+    if ($cur.Y -lt $st.py - 120 * $k -and $cur.Y -gt $wa.Top -and [Math]::Abs($cdx2) -lt 700 * $k -and $cdx2 * $dir -gt -150 * $k -and $rng.Next(2) -eq 0) {
+        $st.anchor = 'cursor'; $st.ax = [double]$cur.X; $st.ay = [double]$cur.Y
+        if ($rng.Next(2) -eq 0) { Say 'thanks for the hand!' 45 }
+    } else {
+        $wallX = if ($dir -gt 0) { $wa.Right - 2 } else { $wa.Left + 2 }
+        if ([Math]::Abs($wallX - $st.px) -lt 380 * $k) {
+            # stick to the side wall and swing back the other way
+            $st.anchor = 'wall'; $st.ax = [double]$wallX; $st.ay = [Math]::Max($wa.Top + 20, $st.py - 280 * $k)
+            $st.travel = -$dir
+        } else {
+            $st.anchor = 'wall'
+            $st.ax = [Math]::Max($wa.Left + 20, [Math]::Min($wa.Right - 20, $st.px + $dir * (240 + $rng.Next(220)) * $k))
+            $st.ay = [double]($wa.Top + 2)
+        }
+    }
+    $dx = $st.px - $st.ax; $dy = $st.py - $st.ay
+    $st.ropeL = [Math]::Sqrt($dx * $dx + $dy * $dy)
+    $st.ropeTarget = [Math]::Min($st.ropeL * 0.85, 420 * $k)     # zip up toward it, then swing
+    $st.anchT = 0
+}
+function Poof {
+    $pool = @($bWhite, $bSilver, $bSteam, $bSpark)
+    for ($i = 0; $i -lt 16; $i++) {
+        [void]$parts.Add(@{ kind = 'spark'; x = [double]($OX + 11 + ($rng.NextDouble() - 0.5) * 18); y = [double]($OY + 4 + $rng.Next(12))
+            vx = ($rng.NextDouble() - 0.5) * 1.6; vy = -0.5 - $rng.NextDouble() * 1.5; b = $pool[$rng.Next($pool.Count)]; sz = 2; life = 14 + $rng.Next(10) })
+    }
+}
+
 # ---------- mouse ----------
 $pb.Add_MouseDown({ param($sender, $e)
     if ($e.Button -eq 'Left') {
@@ -1059,6 +1165,9 @@ $pb.Add_MouseMove({ param($sender, $e)
         if (-not $st.moved -and [Math]::Abs($p.X - $st.downX) + [Math]::Abs($p.Y - $st.downY) -gt 4) {
             $st.moved = $true
             Hide-Cloud
+            if ($web.on) { Web-End }
+            if ($st.suit) { $st.suit = $false; Poof }
+            $st.rot = 0
             $st.mug = 'none'; $parts.Clear(); Leave-Platform
             Say 'wheee!' 60
         }
@@ -1193,6 +1302,10 @@ $timer.Add_Tick({
         if ($free -and $st.mode -ne 'chase' -and $st.tick % 60 -eq 30 -and $st.tick -gt $st.climbCD) {
             if (Try-Climb $w $h $wa) { $free = $false }
         }
+
+        # something interrupted a web-swing: tidy up the web line and the suit
+        if ($web.on -and $st.mode -ne 'swing') { Web-End }
+        if ($st.suit -and $st.mode -ne 'suitup' -and $st.mode -ne 'swing' -and $st.mode -ne 'heropose') { $st.suit = $false; Poof }
 
         switch ($st.mode) {
             'fall' {
@@ -1421,6 +1534,85 @@ $timer.Add_Tick({
                     if ($t -ge $resultT + 60) { Set-Mode 'idle' 30 }
                 }
                 $st.y = $ground - $st.jy
+            }
+            'suitup' {
+                # quick spin + poof into the suit
+                $st.y = $ground; $st.phase = 0; $t = $st.t
+                if ($t -lt 24) { $st.rot = $t * 15 }
+                if ($t -eq 12) { Poof; $st.suit = $true; Say 'suit up!' 40 }
+                if ($t -ge 30) { Set-Mode 'swing' }
+            }
+            'swing' {
+                $t = $st.t
+                if ($t -eq 1) {
+                    Leave-Platform
+                    $st.px = $st.x + ($OX + 11) * $S; $st.py = $st.y + ($OY + 8) * $S
+                    Web-Begin ([System.Windows.Forms.Screen]::FromPoint((New-Object System.Drawing.Point ([int]$st.px), ([int]$st.py))).Bounds)
+                    $st.pvx = 0.0; $st.pvy = 0.0; $st.swings = 0; $st.maxSwings = 4 + $rng.Next(4); $st.flip = 0
+                    $st.travel = if ($st.px -lt ($wa.Left + $wa.Right) / 2) { 1 } else { -1 }
+                    $st.anchor = 'none'; $st.freeT = 99
+                    Say 'THWIP!' 35
+                }
+                $groundC = $ground + ($OY + 8) * $S
+                # falling freely? shoot the next web
+                if ($st.anchor -eq 'none' -and $st.swings -lt $st.maxSwings -and $st.freeT -ge 6 -and $st.pvy -ge -2 * $k) { New-Anchor $wa $cur }
+                $st.freeT++
+
+                # pendulum physics: gravity + an inextensible web that reels in
+                $st.pvy += $GRAV
+                if ($st.anchor -eq 'cursor') { $st.ax = [double]$cur.X; $st.ay = [double]$cur.Y }
+                $st.px += $st.pvx; $st.py += $st.pvy
+                if ($st.anchor -ne 'none') {
+                    $st.ropeL = [Math]::Max($st.ropeTarget, $st.ropeL - 22 * $k)
+                    $dx = $st.px - $st.ax; $dy = $st.py - $st.ay; $d = [Math]::Sqrt($dx * $dx + $dy * $dy)
+                    if ($d -gt $st.ropeL -and $d -gt 0) {
+                        $nx = $dx / $d; $ny = $dy / $d
+                        $st.px = $st.ax + $nx * $st.ropeL; $st.py = $st.ay + $ny * $st.ropeL
+                        $vr = $st.pvx * $nx + $st.pvy * $ny
+                        if ($vr -gt 0) { $st.pvx -= $vr * $nx; $st.pvy -= $vr * $ny }
+                    }
+                    $st.anchT++
+                    # let go at the forward top of the swing (or if it's taking too long)
+                    $forward = ($st.px - $st.ax) * $st.travel -gt 0
+                    if (($st.anchT -gt 18 -and $st.pvx * $st.travel -gt 2 * $k -and $st.pvy -lt 0 -and $forward) -or $st.anchT -gt 140) {
+                        $st.anchor = 'none'; $st.freeT = 0; $st.swings++
+                        $st.pvx *= 1.1; $st.pvy -= 3 * $k
+                        if ($rng.Next(3) -eq 0) { $st.flip = 18 }
+                        if ($rng.Next(3) -eq 0) { $l = @('thwip!', 'wheee!', 'whoo!', 'parkour!'); Say $l[$rng.Next($l.Count)] 35 }
+                    }
+                }
+                # the screen's borders
+                if ($st.px -lt $wa.Left + 40 * $k) { $st.px = $wa.Left + 40 * $k; $st.pvx = [Math]::Abs($st.pvx) * 0.4; $st.travel = 1 }
+                if ($st.px -gt $wa.Right - 40 * $k) { $st.px = $wa.Right - 40 * $k; $st.pvx = -[Math]::Abs($st.pvx) * 0.4; $st.travel = -1 }
+                if ($st.py -lt $wa.Top + 60 * $k) { $st.py = $wa.Top + 60 * $k; $st.pvy = [Math]::Abs($st.pvy) * 0.3 }
+
+                # lean along the web, flip in the air
+                if ($st.anchor -ne 'none') {
+                    $st.rot = [Math]::Atan2($st.py - $st.ay, $st.px - $st.ax) * 180 / [Math]::PI - 90
+                } elseif ($st.flip -gt 0) {
+                    $st.rot = (18 - $st.flip) * 20 * $st.travel; $st.flip--
+                } else { $st.rot = [Math]::Max(-35, [Math]::Min(35, $st.pvx * 1.5)) }
+                $st.arms = 'up'; $st.phase = 0
+
+                # web line from his hands to the anchor
+                if ($st.anchor -ne 'none') {
+                    $rr = $st.rot * [Math]::PI / 180
+                    $hxs = $st.px + [Math]::Sin($rr) * 11 * $S; $hys = $st.py - [Math]::Cos($rr) * 11 * $S
+                    Web-Draw $hxs $hys $st.ax $st.ay
+                } else { Web-Draw }
+
+                $st.x = $st.px - ($OX + 11) * $S; $st.y = $st.py - ($OY + 8) * $S
+                # back on the ground after the last swing
+                if (($st.anchor -eq 'none' -and $st.pvy -gt 0 -and $st.py -ge $groundC) -or $t -gt 1500) {
+                    Web-End; $st.y = $ground; $st.rot = 0; $st.squash = 6; Set-Mode 'heropose'
+                }
+            }
+            'heropose' {
+                $st.y = $ground; $st.phase = 0; $t = $st.t
+                if ($t -lt 50) { $st.sit = $true; $st.arms = if ($st.travel -gt 0) { 'upR' } else { 'upL' } }
+                if ($t -eq 8) { $l = @('nailed it.', 'stuck the landing', 'your friendly neighbourhood Clawd'); Say $l[$rng.Next($l.Count)] 55 }
+                if ($t -eq 70) { Poof; $st.suit = $false }
+                if ($t -ge 90) { Set-Mode 'idle' 30 }
             }
             'wave' {
                 $st.y = $ground; $st.phase = 0; $st.eye = $lookEye
@@ -1676,6 +1868,17 @@ function Invoke-Demo([string]$outDir) {
         else { $st.eyeStyle = 'angry' }
         if ($i -eq 32) { $st.flash = 4; $st.recoil = 3 }
         if ($i -eq 44) { Say 'TRICKSHOT!!' 40; for ($j = 0; $j -lt 6; $j++) { Spawn-Float 'star' ($OX + 4 + $rng.Next(14)) ($OY - 2 - $rng.Next(4)) (($rng.NextDouble() - 0.5) * 0.4) -0.3 35 $bSpark } }
+        Snap
+    }
+    # suit up!
+    Set-Mode 'suitup'
+    for ($i = 0; $i -lt 100; $i++) {
+        Tick-Base
+        if ($i -lt 24) { $st.rot = $i * 15 }
+        if ($i -eq 12) { Poof; $st.suit = $true; Say 'suit up!' 40 }
+        if ($i -ge 30 -and $i -lt 80) { $st.sit = $true; $st.arms = 'upR' }
+        if ($i -eq 40) { Say 'THWIP!' 35 }
+        if ($i -eq 85) { Poof; $st.suit = $false }
         Snap
     }
     # laptop smash

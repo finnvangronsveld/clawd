@@ -42,6 +42,7 @@ He also does things on his own:
 - spots any window he can reach, runs over and jumps onto it, then rides along when you move it
 - shoots tiny pixel pellets at your cursor, aiming in every direction ("gotcha!" / "dang it!")
 - pulls off trickshots: 360 no-scopes, no-look shots and ricochets off the floor ("TRICKSHOT!!")
+- suits up as a web-slinger and swings across your screen, shooting webs at the screen's edges, or at your cursor if it's above him (move it and you drag him along)
 - smashes his laptop ("fixed it.")
 
 He doesn't show up in the taskbar or in Alt+Tab.
