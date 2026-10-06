@@ -2,7 +2,7 @@
 
 A little orange pixel buddy who lives on your Windows desktop.
 
-<p align="center"><img src="docs/clawd.gif" alt="Clawd walking, waving, typing, thinking, dancing, smashing his laptop, watching a movie with popcorn and napping"></p>
+<p align="center"><img src="docs/clawd.gif" alt="Clawd walking, waving, typing, thinking, dancing, smashing his laptop, watching a movie with popcorn, getting mad when it is paused, and napping"></p>
 
 He walks along your taskbar and climbs onto your windows. When you type, he types along on his tiny laptop. When you watch a video, he grabs popcorn and watches with you. Once in a while he smashes his laptop in frustration.
 
@@ -30,7 +30,8 @@ That's it. You don't need admin rights or anything else installed. He appears at
 | Right-click | Opens his thought-cloud menu |
 | Type | He pulls out his laptop and types along |
 | Pause typing | He thinks: spinner plus "Clauding...", "Percolating..." and so on |
-| Watch a video (YouTube, Netflix, Twitch, VLC, ...) | He walks over, sits with his back to you, and eats popcorn in the light of the screen |
+| Watch a video (YouTube, Netflix, Twitch, VLC, ...) | He picks a seat under it, sits with his back to you, eats popcorn in the light of the screen and comments on what you're watching |
+| Pause the video | He turns around and stomps ("hey! I was watching!"), then sulks until you press play |
 | Stay idle for 60 s | He yawns and falls asleep (Zzz) |
 
 He also does things on his own:
@@ -49,7 +50,7 @@ He doesn't show up in the taskbar or in Alt+Tab.
 Everything stays on your PC:
 
 - **Typing:** Clawd only counts how many keys went down, never which keys.
-- **Videos:** he checks the title of the window in front to notice a video, and compares it against a list of video sites and players.
+- **Videos:** he checks the title of the window in front to notice a video, and compares it against a list of video sites and players. He reads whether media is playing or paused from Windows' own media controls (the volume-key overlay).
 
 Nothing is stored or sent anywhere.
 

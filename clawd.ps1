@@ -176,13 +176,42 @@ public static class ClawdCloud {
 }
 "@
 
+# ---------- media sessions (is the video playing or paused?) ----------
+# Windows' own media session API - the thing behind the volume-key media overlay. Local only.
+$script:mediaMgr = $null
+if (-not $RenderFrames) {
+    try {
+        Add-Type -AssemblyName System.Runtime.WindowsRuntime
+        $null = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType = WindowsRuntime]
+        $asTask = [System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object {
+            $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation`1' } | Select-Object -First 1
+        $op = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]::RequestAsync()
+        $task = $asTask.MakeGenericMethod([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]).Invoke($null, @($op))
+        if ($task.Wait(3000)) { $script:mediaMgr = $task.Result }
+    } catch { Write-Log "media sessions unavailable: $_" }
+}
+# 'playing' / 'paused' / 'none' (unknown). Music apps don't count.
+function Get-MediaStatus {
+    if (-not $script:mediaMgr) { return 'none' }
+    try {
+        $paused = $false
+        foreach ($s in $script:mediaMgr.GetSessions()) {
+            if ($s.SourceAppUserModelId -match 'Spotify') { continue }
+            $ps = $s.GetPlaybackInfo().PlaybackStatus.ToString()
+            if ($ps -eq 'Playing') { return 'playing' }
+            if ($ps -eq 'Paused') { $paused = $true }
+        }
+        if ($paused) { 'paused' } else { 'none' }
+    } catch { 'none' }
+}
+
 # ---------- canvas / palette ----------
 $gr0 = [System.Drawing.Graphics]::FromHwnd([IntPtr]::Zero); $dpi = $gr0.DpiX; $gr0.Dispose()
 $S  = [int][Math]::Max(3, [Math]::Round(3 * $dpi / 96.0))   # screen pixels per sprite pixel
 if ($RenderFrames) { $S = 4 }
 $k  = $S / 3.0                                                # motion scale for high-DPI screens
-$GW = 44; $GH = 32          # canvas in sprite pixels
-$OX = 11; $OY = $GH - 16    # Clawd's top-left (he is 22 x 16)
+$GW = 56; $GH = 32          # canvas in sprite pixels (wide enough for speech bubbles)
+$OX = 17; $OY = $GH - 16    # Clawd's top-left (he is 22 x 16), centred
 $GRAV = 0.8 * $k            # gravity
 $SPD = 1.6 * $k             # walk speed
 
@@ -220,6 +249,22 @@ $rimSet = foreach ($c in @(@(165, 212, 255), @(236, 242, 255), @(255, 212, 165),
     @{ rim  = New-Brush $c[0] $c[1] $c[2]
        band = New-Brush ([int](88 + ($c[0] - 88) * 0.4)) ([int](44 + ($c[1] - 44) * 0.4)) ([int](33 + ($c[2] - 33) * 0.4)) }
 }
+# his running commentary (kept short so the bubble fits)
+$commentLines = @('ooh', 'wait, what?', 'no way!', 'plot twist!', 'this part is so good', 'called it.', 'lol', '*crunch crunch*',
+    'pass the popcorn', 'who is this guy?', 'nooo!', 'hehe', 'same tbh', '10/10', 'rewind that!', 'wait for it...',
+    'I knew it', 'classic', 'chills.', 'bro what', 'I could do that', 'this is peak', 'okay okay okay', 'smooth.',
+    'did you see that?', 'love this part', 'oh no no no', 'hmm, suspicious')
+$siteLines = @{
+    'YouTube'               = @('like and subscribe!', 'skip the ad...', 'the algorithm gets me', 'read the comments!')
+    'Netflix|Prime Video'   = @('one more episode?', 'yes, still watching.', 'skip intro!')
+    'Twitch'                = @('chat is wild', 'pog', 'gg')
+    'Disney\+'              = @('magical.')
+    'VLC|Media Player|\bmpv' = @('good movie pick')
+}
+$complainLines = @('hey! I was watching!', 'press play!!', 'UNPAUSE IT', 'ugh, seriously?', 'my popcorn is cold', 'rude.', "don't leave me hanging", 'I need to know!')
+$sulkLines     = @('...', '*sigh*', 'still waiting.', '*crunch*')
+$resumeLines   = @('finally!', 'yesss', "that's better.", 'shh, it started')
+
 $videoRx = ' - YouTube|Netflix|Twitch|Prime Video|Disney\+|Crunchyroll|Vimeo|Plex|VLC media player|Media Player|\bmpv\b|HBO Max|VRT MAX|Streamz|GoPlay|Videoland|Dailymotion'
 $noteBrushes =@($bPurple, $bTeal, $bOrange, $bHeart)
 
@@ -367,6 +412,7 @@ $st = @{
     gun = 0; flash = 0; recoil = 0; hits = 0; poked = $false
     keyCount = 0.0; lastKeyTick = -10000; typeHand = $false
     back = $false; rim = $rimSet[0]; rimEvery = 40; videoSeen = -10000; videoRect = $null
+    videoTitle = ''; media = 'none'; pausedPolls = 0; nextComment = 200; resumed = $false; laughT = 0; watchX = 0.0
 }
 
 function Set-Mode([string]$m, [int]$timer = 0) { $st.mode = $m; $st.timer = $timer; $st.t = 0; $st.hover = 0 }
@@ -607,7 +653,7 @@ function Render-Frame {
 # seen from behind: dark body, bright rim light from the screen, popcorn bucket at his side
 function Render-Back {
     $g.Clear($keyCol)
-    $ox = $OX; $oy = $OY + 2
+    $ox = $OX + $st.wob; $oy = $OY + 2
     $rimB = $st.rim.rim; $bandB = $st.rim.band
 
     # popcorn bucket (drawn first so his arm reaches over it)
@@ -662,7 +708,27 @@ function Step-Watch {
     if ($c -eq 30 -and $rng.Next(3) -eq 0) {
         [void]$parts.Add(@{ kind = 'spark'; x = [double]($OX + 24); y = [double]($OY + 5); vx = -0.2; vy = -2.3; b = $bKernel; sz = 1; life = 30 })
     }
-    if ($st.t -eq 1) { Say 'popcorn time!' 50 }
+    if ($st.t -eq 1 -and -not $st.resumed) { Say 'popcorn time!' 50 }
+    if ($st.laughT -gt 0) { $st.laughT--; $st.wob = if ($st.laughT % 4 -lt 2) { 1 } else { -1 } }
+}
+
+# something to say about what you're watching
+function Get-Comment {
+    $r = $rng.Next(100)
+    # a short bit of the video title, e.g. "Minecraft Hardcore - YouTube" -> "Minecraft Hardcore"
+    $title = ($st.videoTitle -replace '^\(\d+\)\s*', '') -split ' - | \| ' | Select-Object -First 1
+    $short = ''
+    foreach ($wd in ($title -split '\s+')) { if (($short + ' ' + $wd).Trim().Length -gt 14) { break }; $short = ($short + ' ' + $wd).Trim() }
+    if ($r -lt 18 -and $short -and $short -notmatch '^(YouTube|Netflix|Twitch|Prime Video)$') {
+        $opts = @("I love $short", "$short? classic", "ah, $short", "more $short pls")
+        return $opts[$rng.Next($opts.Count)]
+    }
+    if ($r -lt 40) {
+        foreach ($site in $siteLines.Keys) {
+            if ($st.videoTitle -match $site) { $l = $siteLines[$site]; return $l[$rng.Next($l.Count)] }
+        }
+    }
+    return $commentLines[$rng.Next($commentLines.Count)]
 }
 
 # ---------- thought-cloud menu ----------
@@ -936,11 +1002,18 @@ $timer.Add_Tick({
         $fgw = [ClawdNative]::ForegroundWindow()
         if ($fgw -eq $self -or $fgw -eq $cloud.Handle) {
             if ($st.tick - $st.videoSeen -lt 60) { $st.videoSeen = $st.tick }   # clicking him doesn't end movie night
-        } elseif ([ClawdNative]::ForegroundTitle() -match $videoRx) {
-            $st.videoSeen = $st.tick; $st.videoRect = [ClawdNative]::Rect($fgw)
+        } else {
+            $fgTitle = [ClawdNative]::ForegroundTitle()
+            if ($fgTitle -match $videoRx) { $st.videoSeen = $st.tick; $st.videoRect = [ClawdNative]::Rect($fgw); $st.videoTitle = $fgTitle }
         }
     }
     $videoOn = ($st.tick - $st.videoSeen) -lt 60
+    # playing or paused? (only checked while a video is around)
+    if ($st.tick % 15 -eq 7 -and ($videoOn -or $st.mode -eq 'watch' -or $st.mode -eq 'paused')) {
+        $st.media = Get-MediaStatus
+        if ($st.media -eq 'paused') { $st.pausedPolls++ } else { $st.pausedPolls = 0 }
+    }
+    $mediaPaused = $st.pausedPolls -ge 2
 
     # keyboard activity (counts only)
     $kp = [ClawdNative]::KeyPresses()
@@ -1070,21 +1143,59 @@ $timer.Add_Tick({
                 if (-not $videoOn) { Set-Mode 'idle' 30 }
                 elseif ($st.plat -ne [IntPtr]::Zero) { Leave-Platform; Set-Mode 'fall'; $st.vy = 0.0; $st.vx = 0.0 }
                 else {
-                    if ($st.t -eq 1) { Say 'ooh, a video!' 45 }
-                    $r = $st.videoRect
-                    $tx = [Math]::Max($wa.Left + 80, [Math]::Min($wa.Right - 80, ($r[0] + $r[2]) / 2))
-                    $dx = $tx - $cxw
+                    if ($st.t -eq 1) {
+                        Say 'ooh, a video!' 45; $st.resumed = $false
+                        # find a seat: right here if he's already under the video, otherwise some random spot under it
+                        $r = $st.videoRect
+                        $lo = [Math]::Max($wa.Left + 80, $r[0] + 60); $hi = [Math]::Min($wa.Right - 80, $r[2] - 60)
+                        if ($hi -le $lo) { $lo = $wa.Left + 80; $hi = $wa.Right - 80 }
+                        $st.watchX = if ($cxw -ge $lo -and $cxw -le $hi) { $cxw } else { $lo + $rng.NextDouble() * ($hi - $lo) }
+                    }
+                    $dx = $st.watchX - $cxw
                     if ([Math]::Abs($dx) -gt 8 * $k) {
                         $st.dir = if ($dx -gt 0) { 1 } else { -1 }
                         $st.x += 2.4 * $k * $st.dir; $st.eye = $st.dir
                         if ($st.tick % 4 -eq 0) { $st.phase = ($st.phase + 1) % 4 }
-                    } else { Set-Mode 'watch' }
+                    } else { Set-Mode 'watch'; $st.nextComment = 250 + $rng.Next(200) }
                 }
             }
             'watch' {
                 $st.y = $ground
-                Step-Watch
-                if (-not $videoOn) { $st.back = $false; $st.sit = $false; Say 'good show.' 50; Set-Mode 'idle' 40 }
+                if (-not $videoOn) { Say 'good show.' 50; Set-Mode 'idle' 40 }
+                elseif ($mediaPaused) { Set-Mode 'paused' }
+                else {
+                    Step-Watch
+                    # running commentary
+                    if ($st.t -ge $st.nextComment) {
+                        $line = Get-Comment
+                        Say $line 80
+                        if ($line -match 'lol|hehe') { $st.laughT = 24 }
+                        $st.nextComment = $st.t + 330 + $rng.Next(420)
+                    }
+                }
+            }
+            'paused' {
+                # you paused the video. he is NOT happy about it.
+                $st.y = $ground; $t = $st.t
+                if (-not $videoOn) { Say 'fine, be that way.' 50; Set-Mode 'idle' 40 }
+                elseif (-not $mediaPaused) {
+                    Say $resumeLines[$rng.Next($resumeLines.Count)] 50
+                    Set-Mode 'watch'; $st.resumed = $true; $st.nextComment = 300 + $rng.Next(300)
+                } elseif ($t -lt 240) {
+                    # turn around and stomp
+                    $st.eye = 0; $st.eyeStyle = 'angry'; $st.mouth = 'o'
+                    $st.bang = ($t -lt 45 -and $t % 8 -lt 5)
+                    if ($t -lt 90) {
+                        $st.arms = if ([Math]::Floor($t / 4) % 2 -eq 0) { 'up' } else { 'down' }
+                        $st.phase = if ([Math]::Floor($t / 4) % 2 -eq 0) { 1 } else { 3 }
+                        $st.wob = if ($t % 4 -lt 2) { 1 } else { -1 }
+                    } else { $st.arms = 'down'; $st.phase = 0 }
+                    if ($t -eq 1 -or $t % 75 -eq 0) { Say $complainLines[$rng.Next($complainLines.Count)] 60 }
+                } else {
+                    # sulk: sits back down facing the (frozen) screen, waiting
+                    $st.back = $true; $st.sit = $true; $st.arms = 'rest'; $st.phase = 0
+                    if ($t % 220 -eq 0) { Say $sulkLines[$rng.Next($sulkLines.Count)] 50 }
+                }
             }
             'typing' {
                 $st.y = $ground; $st.phase = 0; $st.laptop = 'open'; $st.glow = 'blue'
@@ -1357,7 +1468,23 @@ function Invoke-Demo([string]$outDir) {
     while ($parts.Count -gt 0) { Tick-Base; $parts.RemoveAt($rng.Next($parts.Count)); if ($parts.Count -gt 0) { $parts.RemoveAt($rng.Next($parts.Count)) }; Snap }
     # movie night
     Set-Mode 'watch'
-    for ($i = 0; $i -lt 230; $i++) { Tick-Base; Step-Watch; Snap }
+    for ($i = 0; $i -lt 200; $i++) { Tick-Base; Step-Watch; if ($i -eq 100) { Say 'plot twist!' 70 }; Snap }
+    # ...and you paused it
+    Set-Mode 'paused'
+    for ($i = 0; $i -lt 110; $i++) {
+        Tick-Base; $t = $st.t
+        $st.eyeStyle = 'angry'; $st.mouth = 'o'; $st.bang = ($t -lt 45 -and $t % 8 -lt 5)
+        if ($t -lt 90) {
+            $st.arms = if ([Math]::Floor($t / 4) % 2 -eq 0) { 'up' } else { 'down' }
+            $st.phase = if ([Math]::Floor($t / 4) % 2 -eq 0) { 1 } else { 3 }
+            $st.wob = if ($t % 4 -lt 2) { 1 } else { -1 }
+        } else { $st.arms = 'down'; $st.phase = 0 }
+        if ($t -eq 1) { Say 'hey! I was watching!' 70 }
+        Snap
+    }
+    $st.phase = 0
+    Set-Mode 'watch'; $st.resumed = $true; Say 'finally!' 40
+    for ($i = 0; $i -lt 60; $i++) { Tick-Base; Step-Watch; Snap }
     $st.back = $false
     # nap
     Set-Mode 'sleep'
