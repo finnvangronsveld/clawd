@@ -2,17 +2,23 @@
 # Left-click: hop (click him fast and he gets dizzy) | Drag: pick him up | Rub him with the cursor: pets
 # Right-click: menu
 
+#
+# -RenderFrames <dir> : don't run; play a scripted demo off-screen and save PNG frames (used for the README gif)
+param([string]$RenderFrames)
+
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
 $createdNew = $false
-$mutex = New-Object System.Threading.Mutex($true, 'Local\ClawdDesktopPet', [ref]$createdNew)
+$mutexName = if ($RenderFrames) { "Local\ClawdRender_$PID" } else { 'Local\ClawdDesktopPet' }
+$mutex = New-Object System.Threading.Mutex($true, $mutexName, [ref]$createdNew)
 if (-not $createdNew) {
     # already running (e.g. launched again from Start): poke the running Clawd so he waves
     try { $ev = [System.Threading.EventWaitHandle]::OpenExisting('Local\ClawdPoke'); [void]$ev.Set() } catch {}
     return
 }
-$poke = New-Object System.Threading.EventWaitHandle($false, [System.Threading.EventResetMode]::AutoReset, 'Local\ClawdPoke')
+$pokeName = if ($RenderFrames) { "Local\ClawdRenderPoke_$PID" } else { 'Local\ClawdPoke' }
+$poke = New-Object System.Threading.EventWaitHandle($false, [System.Threading.EventResetMode]::AutoReset, $pokeName)
 
 $logFile = Join-Path $PSScriptRoot 'clawd.log'
 $script:errCount = 0
@@ -60,6 +66,12 @@ public static class ClawdNative {
     public static void MakeOverlay(IntPtr h) { SetWindowLong(h, -20, GetWindowLong(h, -20) | 0x80 | 0x20 | 0x08000000); }
     public static void ShowNoActivate(IntPtr h) { ShowWindow(h, 4); }
     public static void HideWin(IntPtr h) { ShowWindow(h, 0); }
+
+    // which window is in front, and its title (used to notice you're watching a video; checked locally only)
+    [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr h, StringBuilder sb, int n);
+    public static IntPtr ForegroundWindow() { return GetForegroundWindow(); }
+    public static string ForegroundTitle() { StringBuilder sb = new StringBuilder(512); GetWindowText(GetForegroundWindow(), sb, 512); return sb.ToString(); }
 
     // tool window = no taskbar button and not listed in Alt+Tab
     public static void HideFromAltTab(IntPtr h) {
@@ -167,6 +179,7 @@ public static class ClawdCloud {
 # ---------- canvas / palette ----------
 $gr0 = [System.Drawing.Graphics]::FromHwnd([IntPtr]::Zero); $dpi = $gr0.DpiX; $gr0.Dispose()
 $S  = [int][Math]::Max(3, [Math]::Round(3 * $dpi / 96.0))   # screen pixels per sprite pixel
+if ($RenderFrames) { $S = 4 }
 $k  = $S / 3.0                                                # motion scale for high-DPI screens
 $GW = 44; $GH = 32          # canvas in sprite pixels
 $OX = 11; $OY = $GH - 16    # Clawd's top-left (he is 22 x 16)
@@ -197,6 +210,17 @@ $bPurple  = New-Brush 160 120 255
 $bTeal    = New-Brush 50 195 175
 $bGun     = New-Brush 132 138 150
 $bGrip    = New-Brush 96 62 40
+# movie night: his back in the dark, rim-lit by whatever is on screen
+$bBack        = New-Brush 88 44 33
+$bKernel      = New-Brush 250 238 195
+$bKernelShade = New-Brush 214 188 128
+$bBucketRed   = New-Brush 122 34 36
+$bBucketWhite = New-Brush 148 148 158
+$rimSet = foreach ($c in @(@(165, 212, 255), @(236, 242, 255), @(255, 212, 165), @(185, 255, 215), @(255, 178, 220), @(200, 190, 255))) {
+    @{ rim  = New-Brush $c[0] $c[1] $c[2]
+       band = New-Brush ([int](88 + ($c[0] - 88) * 0.4)) ([int](44 + ($c[1] - 44) * 0.4)) ([int](33 + ($c[2] - 33) * 0.4)) }
+}
+$videoRx = ' - YouTube|Netflix|Twitch|Prime Video|Disney\+|Crunchyroll|Vimeo|Plex|VLC media player|Media Player|\bmpv\b|HBO Max|VRT MAX|Streamz|GoPlay|Videoland|Dailymotion'
 $noteBrushes =@($bPurple, $bTeal, $bOrange, $bHeart)
 
 $canvas = New-Object System.Drawing.Bitmap ($GW * $S), ($GH * $S)
@@ -297,11 +321,11 @@ function Set-Startup([bool]$on) {
     if ($on) { New-Shortcut $startupLnk }
     elseif (Test-Path $startupLnk) { Remove-Item -LiteralPath $startupLnk -Force }
 }
-try {
+if (-not $RenderFrames) { try {
     if (-not (Test-Path $iconPath)) { Make-Icon $iconPath }
     New-Shortcut $startMenuLnk                                   # Start menu entry, kept pointing here
     if (Test-Path $startupLnk) { New-Shortcut $startupLnk }      # refresh path + icon
-} catch { Write-Log "shortcut setup: $_" }
+} catch { Write-Log "shortcut setup: $_" } }
 
 # ---------- window ----------
 $form = New-Object System.Windows.Forms.Form
@@ -342,6 +366,7 @@ $st = @{
     plat = [IntPtr]::Zero; platRect = $null; walkOff = $false; target = [IntPtr]::Zero; menuOpen = $false
     gun = 0; flash = 0; recoil = 0; hits = 0; poked = $false
     keyCount = 0.0; lastKeyTick = -10000; typeHand = $false
+    back = $false; rim = $rimSet[0]; rimEvery = 40; videoSeen = -10000; videoRect = $null
 }
 
 function Set-Mode([string]$m, [int]$timer = 0) { $st.mode = $m; $st.timer = $timer; $st.t = 0; $st.hover = 0 }
@@ -444,6 +469,7 @@ function Draw-Bubble([string]$text, [bool]$spin, [int]$headTopPx) {
 }
 
 function Render-Frame {
+    if ($st.back) { Render-Back; return }
     $g.Clear($keyCol)
     $ox = $OX + $st.wob; $oy = $OY
     $low = $st.sit -or $st.squash -gt 0
@@ -575,6 +601,68 @@ function Render-Frame {
     if ($st.sayT -gt 0 -and $st.say -and $st.laptop -ne 'held') { Draw-Bubble $st.say $st.spin ($oy * $S) }
 
     $pb.Invalidate()
+}
+
+# ---------- movie night ----------
+# seen from behind: dark body, bright rim light from the screen, popcorn bucket at his side
+function Render-Back {
+    $g.Clear($keyCol)
+    $ox = $OX; $oy = $OY + 2
+    $rimB = $st.rim.rim; $bandB = $st.rim.band
+
+    # popcorn bucket (drawn first so his arm reaches over it)
+    $bx2 = $ox + 22; $by2 = $oy + 7
+    Px ($bx2 - 1) ($by2 - 3) 8 11 $rimB
+    Px $bx2 ($by2 - 4) 6 1 $rimB
+    for ($col = 0; $col -lt 6; $col++) { Px ($bx2 + $col) $by2 1 7 $(if ($col % 2 -eq 0) { $bBucketRed } else { $bBucketWhite }) }
+    Px $bx2 $by2 6 1 $bandB
+    Px $bx2 ($by2 - 2) 6 2 $bKernel; Px ($bx2 + 1) ($by2 - 3) 4 1 $bKernel
+    Px ($bx2 + 1) ($by2 - 1) 1 1 $bKernelShade; Px ($bx2 + 4) ($by2 - 2) 1 1 $bKernelShade
+
+    # silhouette
+    $orangeList.Clear()
+    Add-O ($ox + 4) $oy 14 12
+    Add-O $ox ($oy + 6) 4 2
+    switch ($st.arms) {
+        'reach' { Add-O ($ox + 18) ($oy + 6) 5 2 }
+        'eat'   { Add-O ($ox + 18) ($oy + 1) 2 7 }
+        default { Add-O ($ox + 18) ($oy + 6) 4 2 }
+    }
+    foreach ($q in $orangeList) { Px ($q[0] - 1) ($q[1] - 1) ($q[2] + 2) ($q[3] + 2) $rimB }
+    Px ($ox + 3) ($oy + 12) 1 3 $rimB; Px ($ox + 18) ($oy + 12) 1 3 $rimB
+    foreach ($q in $orangeList) { Px $q[0] $q[1] $q[2] $q[3] $bBack }
+    Px ($ox + 4) ($oy + 12) 14 1 $bBack
+    foreach ($c in 4, 8, 12, 16) { Px ($ox + $c) ($oy + 12) 2 2 $bBack }
+    # light wrapping round the edges
+    Px ($ox + 4) $oy 14 1 $bandB
+    Px ($ox + 4) ($oy + 1) 1 11 $bandB
+    Px ($ox + 17) ($oy + 1) 1 11 $bandB
+    Px $ox ($oy + 6) 4 1 $bandB
+    if ($st.arms -eq 'eat') { Px ($ox + 18) ($oy + 1) 1 7 $bandB } else { Px ($ox + 18) ($oy + 6) 4 1 $bandB }
+
+    foreach ($p in $parts) {
+        if ($p.kind -eq 'float') { Glyph $p.glyph ([int][Math]::Floor($p.x) * $S) ([int][Math]::Floor($p.y) * $S) $S $p.b }
+        else { Px $p.x $p.y $p.sz $p.sz $p.b }
+    }
+    if ($st.sayT -gt 0 -and $st.say) { Draw-Bubble $st.say $false ($oy * $S) }
+    $pb.Invalidate()
+}
+
+function Step-Watch {
+    $st.back = $true; $st.sit = $true; $st.phase = 0
+    # the screen's light keeps changing, like a real video
+    if ($st.t -eq 1 -or $st.t % $st.rimEvery -eq 0) { $st.rim = $rimSet[$rng.Next($rimSet.Count)]; $st.rimEvery = 20 + $rng.Next(50) }
+    $c = $st.t % 100
+    $st.arms = if ($c -ge 60 -and $c -lt 70) { 'reach' } elseif ($c -ge 70 -and $c -lt 88) { 'eat' } else { 'rest' }
+    if ($c -eq 80) {
+        for ($i = 0; $i -lt 3; $i++) {
+            [void]$parts.Add(@{ kind = 'spark'; x = [double]($OX + 16 + $rng.Next(3)); y = [double]($OY + 4); vx = ($rng.NextDouble() - 0.5) * 0.6; vy = -0.6; b = $bKernel; sz = 1; life = 25 })
+        }
+    }
+    if ($c -eq 30 -and $rng.Next(3) -eq 0) {
+        [void]$parts.Add(@{ kind = 'spark'; x = [double]($OX + 24); y = [double]($OY + 5); vx = -0.2; vy = -2.3; b = $bKernel; sz = 1; life = 30 })
+    }
+    if ($st.t -eq 1) { Say 'popcorn time!' 50 }
 }
 
 # ---------- thought-cloud menu ----------
@@ -833,7 +921,7 @@ $timer.Add_Tick({
 
     # per-frame visual defaults
     $st.arms = 'out'; $st.eyeStyle = 'normal'; $st.mouth = 'none'; $st.blush = $false; $st.sit = $false
-    $st.wob = 0; $st.mug = 'none'; $st.laptop = 'none'; $st.bang = $false; $st.spin = $false; $st.gun = 0
+    $st.wob = 0; $st.mug = 'none'; $st.laptop = 'none'; $st.bang = $false; $st.spin = $false; $st.gun = 0; $st.back = $false
 
     if ($st.tick % 10 -eq 0) { $st.idleMs = [ClawdNative]::IdleMs() }
     if ($st.blink -gt 0) { $st.blink-- }
@@ -842,6 +930,17 @@ $timer.Add_Tick({
     if ($st.squash -gt 0) { $st.squash-- }
     if ($st.flash -gt 0) { $st.flash-- }
     if ($st.recoil -gt 0) { $st.recoil-- }
+
+    # is a video in front? (window title check, local only)
+    if ($st.tick % 15 -eq 0) {
+        $fgw = [ClawdNative]::ForegroundWindow()
+        if ($fgw -eq $self -or $fgw -eq $cloud.Handle) {
+            if ($st.tick - $st.videoSeen -lt 60) { $st.videoSeen = $st.tick }   # clicking him doesn't end movie night
+        } elseif ([ClawdNative]::ForegroundTitle() -match $videoRx) {
+            $st.videoSeen = $st.tick; $st.videoRect = [ClawdNative]::Rect($fgw)
+        }
+    }
+    $videoOn = ($st.tick - $st.videoSeen) -lt 60
 
     # keyboard activity (counts only)
     $kp = [ClawdNative]::KeyPresses()
@@ -868,6 +967,9 @@ $timer.Add_Tick({
         elseif ([System.Windows.Forms.Control]::MouseButtons -ne 'None' -and -not $cloud.Bounds.Contains($cur) -and -not $form.Bounds.Contains($cur)) { Hide-Cloud }
     } else {
         $free = ($st.mode -eq 'walk' -or $st.mode -eq 'idle' -or $st.mode -eq 'chase')
+
+        # you're watching something: he comes over with popcorn (and doesn't fall asleep)
+        if ($videoOn -and ($free -or $st.mode -eq 'sleep' -or $st.mode -eq 'yawn')) { Set-Mode 'gowatch'; $free = $false }
 
         # sleepy after a minute of no input
         if ($free -and $st.idleMs -ge 60000) { Set-Mode 'yawn'; $free = $false }
@@ -962,6 +1064,27 @@ $timer.Add_Tick({
                         } else { Set-Mode 'idle' 20 }
                     } else { Set-Mode 'idle' 20 }
                 }
+            }
+            'gowatch' {
+                $st.y = $ground
+                if (-not $videoOn) { Set-Mode 'idle' 30 }
+                elseif ($st.plat -ne [IntPtr]::Zero) { Leave-Platform; Set-Mode 'fall'; $st.vy = 0.0; $st.vx = 0.0 }
+                else {
+                    if ($st.t -eq 1) { Say 'ooh, a video!' 45 }
+                    $r = $st.videoRect
+                    $tx = [Math]::Max($wa.Left + 80, [Math]::Min($wa.Right - 80, ($r[0] + $r[2]) / 2))
+                    $dx = $tx - $cxw
+                    if ([Math]::Abs($dx) -gt 8 * $k) {
+                        $st.dir = if ($dx -gt 0) { 1 } else { -1 }
+                        $st.x += 2.4 * $k * $st.dir; $st.eye = $st.dir
+                        if ($st.tick % 4 -eq 0) { $st.phase = ($st.phase + 1) % 4 }
+                    } else { Set-Mode 'watch' }
+                }
+            }
+            'watch' {
+                $st.y = $ground
+                Step-Watch
+                if (-not $videoOn) { $st.back = $false; $st.sit = $false; Say 'good show.' 50; Set-Mode 'idle' 40 }
             }
             'typing' {
                 $st.y = $ground; $st.phase = 0; $st.laptop = 'open'; $st.glow = 'blue'
@@ -1078,9 +1201,36 @@ $timer.Add_Tick({
                     Say 'huh?!' 40; Start-Hop (7 * $k) 0
                 }
             }
-            'smash' {
+            'smash' { $st.y = $ground; Step-Smash }
+        }
+
+        # keep him on screen
+        $minX = $wa.Left - ($OX + 4) * $S
+        $maxX = $wa.Right - ($OX + 18) * $S
+        if ($st.x -le $minX) { $st.x = [double]$minX; $st.dir = 1; $st.vx = [Math]::Abs($st.vx) }
+        if ($st.x -ge $maxX) { $st.x = [double]$maxX; $st.dir = -1; $st.vx = -[Math]::Abs($st.vx) }
+        if ($st.mode -ne 'fall' -and $st.y -gt $ground) { $st.y = $ground }
+
+        $shakeX = 0; $shakeY = 0
+        if ($st.shake -gt 0) { $st.shake--; $shakeX = ($rng.Next(5) - 2) * $S; $shakeY = ($rng.Next(3) - 1) * $S }
+        $form.Location = New-Object System.Drawing.Point ([int]$st.x + $shakeX), ([int]$st.y + $shakeY)
+    }
+
+    Update-Particles
+    Render-Frame
+    if ($st.tick % 300 -eq 0) {
+        $form.TopMost = $true; $form.BringToFront()
+        [ClawdNative]::HideFromAltTab($form.Handle)
+    }
+  } catch {
+    if ($script:errCount -lt 5) { $script:errCount++; Write-Log "$_ @ line $($_.InvocationInfo.ScriptLineNumber)" }
+  }
+})
+
+# the laptop-smash sequence, one tick at a time (driven by $st.t)
+function Step-Smash {
                 $t = $st.t
-                $st.y = $ground; $st.phase = 0; $st.eye = 0
+                $st.phase = 0; $st.eye = 0
                 if ($t -lt 15) {
                     $st.laptop = 'open'; $st.glow = 'blue'; $st.eyeStyle = 'down'
                 } elseif ($t -lt 110) {
@@ -1114,22 +1264,10 @@ $timer.Add_Tick({
                 } else {
                     $parts.Clear(); Set-Mode 'walk'
                 }
-            }
-        }
+}
 
-        # keep him on screen
-        $minX = $wa.Left - ($OX + 4) * $S
-        $maxX = $wa.Right - ($OX + 18) * $S
-        if ($st.x -le $minX) { $st.x = [double]$minX; $st.dir = 1; $st.vx = [Math]::Abs($st.vx) }
-        if ($st.x -ge $maxX) { $st.x = [double]$maxX; $st.dir = -1; $st.vx = -[Math]::Abs($st.vx) }
-        if ($st.mode -ne 'fall' -and $st.y -gt $ground) { $st.y = $ground }
-
-        $shakeX = 0; $shakeY = 0
-        if ($st.shake -gt 0) { $st.shake--; $shakeX = ($rng.Next(5) - 2) * $S; $shakeY = ($rng.Next(3) - 1) * $S }
-        $form.Location = New-Object System.Drawing.Point ([int]$st.x + $shakeX), ([int]$st.y + $shakeY)
-    }
-
-    # particles
+# floating glyphs, debris and sparks
+function Update-Particles {
     for ($i = $parts.Count - 1; $i -ge 0; $i--) {
         $p = $parts[$i]
         if ($p.kind -eq 'float') {
@@ -1147,16 +1285,7 @@ $timer.Add_Tick({
             if ($p.kind -eq 'spark') { $p.life--; if ($p.life -le 0) { $parts.RemoveAt($i) } }
         }
     }
-
-    Render-Frame
-    if ($st.tick % 300 -eq 0) {
-        $form.TopMost = $true; $form.BringToFront()
-        [ClawdNative]::HideFromAltTab($form.Handle)
-    }
-  } catch {
-    if ($script:errCount -lt 5) { $script:errCount++; Write-Log "$_ @ line $($_.InvocationInfo.ScriptLineNumber)" }
-  }
-})
+}
 
 $form.Add_Shown({
     [ClawdNative]::HideFromAltTab($form.Handle)
@@ -1164,4 +1293,78 @@ $form.Add_Shown({
     $timer.Start()
 })
 $form.Add_FormClosed({ $timer.Stop(); $mutex.ReleaseMutex() })
+
+# ---------- demo renderer (for the README gif) ----------
+function Invoke-Demo([string]$outDir) {
+    New-Item -ItemType Directory -Force $outDir | Out-Null
+    $stage = New-Object System.Drawing.Bitmap ($canvas.Width * 3), $canvas.Height
+    $sg = [System.Drawing.Graphics]::FromImage($stage)
+    $script:cx = [double]($canvas.Width * 0.15)
+    $script:frameNo = 0
+
+    function Tick-Base {
+        $st.tick++; $st.t++
+        $st.arms = 'out'; $st.eyeStyle = 'normal'; $st.mouth = 'none'; $st.blush = $false; $st.sit = $false
+        $st.wob = 0; $st.mug = 'none'; $st.laptop = 'none'; $st.bang = $false; $st.spin = $false; $st.gun = 0; $st.back = $false
+        if ($st.blink -gt 0) { $st.blink-- } else { $st.nextBlink--; if ($st.nextBlink -le 0) { $st.blink = 4; $st.nextBlink = 80 + $rng.Next(150) } }
+        if ($st.sayT -gt 0) { $st.sayT-- }
+        if ($st.squash -gt 0) { $st.squash-- }
+    }
+    function Snap {
+        Update-Particles
+        if ($st.tick % 2 -ne 0) { return }      # one gif frame per two ticks
+        Render-Frame
+        $sx = 0
+        if ($st.shake -gt 0) { $st.shake--; $sx = ($rng.Next(5) - 2) * $S }
+        $sg.Clear($keyCol)
+        $sg.DrawImage($canvas, [int]$script:cx + $sx, 0, $canvas.Width, $canvas.Height)
+        $stage.Save((Join-Path $outDir ('f{0:D4}.png' -f $script:frameNo)), [System.Drawing.Imaging.ImageFormat]::Png)
+        $script:frameNo++
+    }
+    function Typing-Frame([bool]$keys) {
+        $st.laptop = 'open'; $st.glow = 'blue'; $st.eyeStyle = 'down'; $st.eye = 0
+        if ($keys -and $st.t % 4 -eq 0) { $st.typeHand = -not $st.typeHand; $st.lastKeyTick = $st.tick
+            if ($rng.Next(2) -eq 0) { Spawn-Float 'dot' $(if ($rng.Next(2) -eq 0) { $OX + 1 + $rng.Next(3) } else { $OX + 18 + $rng.Next(3) }) ($OY + 5) (($rng.NextDouble() - 0.5) * 0.3) -0.3 14 $bBlue } }
+        $st.arms = if ($st.tick - $st.lastKeyTick -lt 3) { if ($st.typeHand) { 'typeL' } else { 'typeR' } } else { 'down' }
+    }
+
+    # walk in
+    Set-Mode 'walk'; $st.dir = 1
+    for ($i = 0; $i -lt 90; $i++) { Tick-Base; $st.eye = 1; $script:cx += $SPD; if ($st.tick % 5 -eq 0) { $st.phase = ($st.phase + 1) % 4 }; Snap }
+    $st.phase = 0
+    # wave
+    Set-Mode 'wave'; Say 'hi!' 50
+    for ($i = 0; $i -lt 56; $i++) { Tick-Base; $st.eyeStyle = 'happy'; $st.mouth = 'smile'; $st.arms = if ([Math]::Floor($st.t / 6) % 2 -eq 0) { 'wave1' } else { 'wave2' }; Snap }
+    # types along with you...
+    Set-Mode 'typing'
+    for ($i = 0; $i -lt 70; $i++) { Tick-Base; Typing-Frame $true; Snap }
+    # ...thinks when you pause...
+    $st.word = 'Clauding'
+    for ($i = 0; $i -lt 64; $i++) { Tick-Base; $st.laptop = 'open'; $st.glow = 'blue'; $st.arms = 'down'; $st.eye = 1; $st.eyeStyle = 'up'; $st.spin = $true; Say ($st.word + '...') 2; Snap }
+    # ...and types again
+    for ($i = 0; $i -lt 30; $i++) { Tick-Base; Typing-Frame $true; Snap }
+    # dance
+    Set-Mode 'dance'
+    for ($i = 0; $i -lt 96; $i++) {
+        Tick-Base; $st.eyeStyle = 'happy'; $st.mouth = 'smile'
+        $beat = [int][Math]::Floor($st.t / 8); $st.sit = ($beat % 2 -eq 1); $st.arms = if ($beat % 2 -eq 0) { 'upL' } else { 'upR' }
+        if ($st.t % 14 -eq 1) { Spawn-Float 'note' ($OX + 9 + $rng.Next(-10, 11)) ($OY - 4) (($rng.NextDouble() - 0.5) * 0.25) -0.3 45 $noteBrushes[$rng.Next($noteBrushes.Count)] }
+        Snap
+    }
+    # laptop smash
+    $parts.Clear(); Set-Mode 'smash'
+    for ($i = 0; $i -lt 330; $i++) { Tick-Base; if ($st.t -lt 15) { $st.t = 15 }; Step-Smash; Snap }
+    while ($parts.Count -gt 0) { Tick-Base; $parts.RemoveAt($rng.Next($parts.Count)); if ($parts.Count -gt 0) { $parts.RemoveAt($rng.Next($parts.Count)) }; Snap }
+    # movie night
+    Set-Mode 'watch'
+    for ($i = 0; $i -lt 230; $i++) { Tick-Base; Step-Watch; Snap }
+    $st.back = $false
+    # nap
+    Set-Mode 'sleep'
+    for ($i = 0; $i -lt 110; $i++) { Tick-Base; $st.sit = $true; $st.eyeStyle = 'sleep'; $st.arms = 'down'; if ($st.t % 35 -eq 1) { Spawn-Float 'z' ($OX + 17) ($OY - 2) 0.12 -0.18 60 $bBlue }; Snap }
+    $sg.Dispose()
+    "$script:frameNo frames -> $outDir"
+}
+
+if ($RenderFrames) { Invoke-Demo $RenderFrames; $mutex.ReleaseMutex(); return }
 [System.Windows.Forms.Application]::Run($form)

@@ -2,24 +2,21 @@
 
 A little orange pixel buddy who lives on your Windows desktop.
 
-He walks along your taskbar, climbs onto your windows, types along when you type, and occasionally smashes his laptop in frustration.
+<p align="center"><img src="docs/clawd.gif" alt="Clawd walking, waving, typing, thinking, dancing, smashing his laptop, watching a movie with popcorn and napping"></p>
 
-![Clawd](clawd.ico)
+He walks along your taskbar and climbs onto your windows. When you type, he types along on his tiny laptop. When you watch a video, he grabs popcorn and watches with you. Once in a while he smashes his laptop in frustration.
 
-## Running him
+## Install
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -STA -File .\clawd.ps1
-```
+1. **[Download Clawd](https://github.com/finnvangronsveld/clawd/releases/latest/download/Clawd.zip)** and unzip it anywhere.
+2. Double-click **`Install Clawd.cmd`**.
 
-You only need to run that command the first time. On launch, Clawd creates:
+That's it. You don't need admin rights or anything else installed. He appears at the bottom of your screen and starts with Windows from then on.
 
-- a **Start menu** entry called "Clawd". Use it to bring him back after you've said bye. If he's already running, he waves at you instead.
-- a `launch.vbs` next to the script, which starts him without a console window.
+- **Bring him back:** if you send him away, start **Clawd** from the Start menu.
+- **Uninstall:** use **Settings › Apps**, or double-click `Uninstall Clawd.cmd`.
 
-**Start with Windows** is a toggle in his menu.
-
-Nothing to install: it's a single PowerShell script using Windows Forms, plus a few Win32 calls compiled on the fly.
+> Windows might ask whether you want to run a file downloaded from the internet. Choose **Run**. Clawd is a single readable PowerShell script ([`clawd.ps1`](clawd.ps1)), so you can see exactly what he does.
 
 ## Things to do with him
 
@@ -33,6 +30,7 @@ Nothing to install: it's a single PowerShell script using Windows Forms, plus a 
 | Right-click | Opens his thought-cloud menu |
 | Type | He pulls out his laptop and types along |
 | Pause typing | He thinks: spinner plus "Clauding...", "Percolating..." and so on |
+| Watch a video (YouTube, Netflix, Twitch, VLC, ...) | He walks over, sits with his back to you, and eats popcorn in the light of the screen |
 | Stay idle for 60 s | He yawns and falls asleep (Zzz) |
 
 He also does things on his own:
@@ -48,10 +46,24 @@ He doesn't show up in the taskbar or in Alt+Tab.
 
 ## Privacy
 
-To type along with you, Clawd polls the keyboard state and only counts how many keys went down. It never records which keys you pressed, and nothing is stored or sent anywhere.
+Everything stays on your PC:
 
-## Uninstall
+- **Typing:** Clawd only counts how many keys went down, never which keys.
+- **Videos:** he checks the title of the window in front to notice a video, and compares it against a list of video sites and players.
 
-1. Right-click him and choose **Bye, Clawd**.
-2. Delete `Clawd.lnk` from the Start menu (`shell:programs`) and, if you enabled it, from Startup (`shell:startup`).
-3. Delete this folder.
+Nothing is stored or sent anywhere.
+
+## For tinkerers
+
+Run him straight from a clone:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -STA -File .\clawd.ps1
+```
+
+Rebuild the GIF above. This renders a scripted demo off-screen, then needs Python with Pillow:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -STA -File .\clawd.ps1 -RenderFrames .\frames
+python tools\make_gif.py .\frames docs\clawd.gif
+```
