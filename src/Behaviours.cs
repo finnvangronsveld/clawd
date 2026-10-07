@@ -89,6 +89,7 @@ namespace Clawd
             if (cfg.Tricks) add("trick", 4);
             if (cfg.WebSwing) add("suitup", 4);
             if (cfg.Needs && needs.Energy < 30) add("nap", 14);
+            add("signature", 7);
             add("walk", 45);
             double sum = 0; foreach (double w in wts) sum += w;
             double r = rng.NextDouble() * sum; string pick = "walk";
@@ -99,6 +100,7 @@ namespace Clawd
                 case "think": Set("think"); word = Pick(thinkWords); break;
                 case "smash": parts.Clear(); Set("smash"); break;
                 case "nap": napping = true; Set("yawn"); break;
+                case "signature": DoSignature(); break;
                 case "walk": if (rng.Next(3) == 0) Dir = -Dir; Set("walk"); break;
                 default: Set(pick); break;
             }
@@ -162,6 +164,7 @@ namespace Clawd
                     Y = ground;
                     if (cdist < 900 * K) { L.Eye = lookEye; if (lookUp) L.EyeStyle = "up"; if (cfg.Needs && needs.Love > 85 && cdist < 300 * K && (Tick / 90) % 6 == 0) L.EyeStyle = "heart"; }
                     else if (rng.Next(90) == 0) L.Eye = rng.Next(3) - 1;
+                    if (SpeciesList.Current.Lines.Length > 0 && Chance(5000)) Chat(Pick(SpeciesList.Current.Lines), 110);
                     if (cfg.Needs && needs.Fullness < 15) L.EyeStyle = "sad";
                     if (--Timer <= 0) PickActivity();
                     break;
@@ -449,6 +452,32 @@ namespace Clawd
                     if (t == 140) { Poof(); suit = false; }
                     if (t >= 180) Set("idle", 60);
                     break;
+                case "switch":       // front flip + poof, and a different pet lands
+                    {
+                        if (t == 1) { jv = 5.4 * K; jy = 0; air = true; Say("ta-da!", 50); }
+                        if (air) { jy += jv; jv -= G; }
+                        rot = Math.Min(360, t * 360.0 / 50) * Dir;
+                        L.Arms = "up"; L.EyeStyle = "happy";
+                        if (t == 25 && pending != null) { Poof(); Poof(); SpeciesList.Current = pending; pending = null; }
+                        if (air && jy <= 0 && t > 2) { jy = 0; air = false; rot = 0; squashT = 14; tuftT = 18; Say(SpeciesList.Current.Hello, 120); Set("idle", 90); }
+                        Y = ground - jy;
+                        break;
+                    }
+                case "flip":         // Flippy's thing: a front flip forward, landing with a squash and a bouncy tuft
+                    {
+                        if (t == 1) Chat(SpeciesList.Current.SignatureLine, 80);
+                        if (t < 18) { L.Sit = true; L.EyeStyle = "happy"; Y = ground; break; }
+                        if (t == 18) { jv = 5.6 * K; jy = 0; air = true; squashT = 6; }
+                        if (air)
+                        {
+                            jy += jv; jv -= G; X += 1.5 * K * Dir;
+                            rot = Math.Min(360, (t - 18) * 360.0 / 52) * Dir; L.Arms = "up"; L.EyeStyle = "happy";
+                            if (jy <= 0 && t > 20) { jy = 0; air = false; rot = 0; squashT = 14; tuftT = 18; needs.Fun += 3; }
+                        }
+                        else { L.EyeStyle = "happy"; L.Mouth = "smile"; if (t > 140) Set("idle", 60); }
+                        Y = ground - jy;
+                        break;
+                    }
                 default: Set("idle", 60); break;
             }
         }

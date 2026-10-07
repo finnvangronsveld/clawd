@@ -107,6 +107,7 @@ namespace Clawd
             if (!GetLastInputInfo(ref l)) return 0;
             return unchecked((uint)Environment.TickCount - l.dwTime);
         }
+        public static bool EscDown() { return (GetAsyncKeyState(0x1B) & 0x8000) != 0; }
         public static bool LeftButtonDown() { return (GetAsyncKeyState(1) & 0x8000) != 0; }
         public static bool AnyMouseButtonDown() { return ((GetAsyncKeyState(1) | GetAsyncKeyState(2) | GetAsyncKeyState(4)) & 0x8000) != 0; }
 

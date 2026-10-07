@@ -10,7 +10,7 @@ namespace Clawd
 {
     static class Store
     {
-        public static readonly string Dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Clawd");
+        public static string Dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Clawd");
         public static Dictionary<string, string> Load(string name)
         {
             var d = new Dictionary<string, string>();
@@ -56,6 +56,7 @@ namespace Clawd
         public double Size = 1.0;        // 0.5 .. 2
         public double Activity = 1.0;    // 0.3 (calm) .. 2 (hyper)
         public double Chatty = 1.0;      // 0 (quiet) .. 2
+        public string Pet = "flippy";    // which pet (species id); unknown ids fall back to the default
         public event Action Changed;
 
         static readonly string[] keys = { "Gun", "Tricks", "WebSwing", "Smash", "MovieNight", "PauseTantrum", "Commentary", "TypeAlong", "Climbing", "Needs", "PcReactions", "Music" };
@@ -78,12 +79,14 @@ namespace Clawd
             Size = Math.Max(0.5, Math.Min(2, Store.D(d, "Size", 1)));
             Activity = Math.Max(0.3, Math.Min(2, Store.D(d, "Activity", 1)));
             Chatty = Math.Max(0, Math.Min(2, Store.D(d, "Chatty", 1)));
+            string pet; Pet = d.TryGetValue("Pet", out pet) ? pet : SpeciesList.Default.Id;
+            Pet = SpeciesList.Get(Pet).Id;
         }
         public void Save()
         {
             var d = new Dictionary<string, string>();
             foreach (string k in keys) d[k] = Get(k) ? "1" : "0";
-            d["Size"] = Store.F(Size); d["Activity"] = Store.F(Activity); d["Chatty"] = Store.F(Chatty);
+            d["Size"] = Store.F(Size); d["Activity"] = Store.F(Activity); d["Chatty"] = Store.F(Chatty); d["Pet"] = Pet;
             Store.Save("settings.ini", d);
             if (Changed != null) Changed();
         }
@@ -96,7 +99,7 @@ namespace Clawd
             new[] { "Needs", "Gets hungry, tired, bored (and needs love)" }, new[] { "PcReactions", "Reacts to your PC (battery, late nights, copying, busy CPU)" },
             new[] { "Gun", "Pellet gun" }, new[] { "Tricks", "Trickshots" }, new[] { "WebSwing", "Web-slinger suit" }, new[] { "Smash", "Smashes his laptop" } };
 
-        public Form BuildForm(Func<bool> getStartup, Action<bool> setStartup, Action resetNeeds)
+        public Form BuildForm(Func<bool> getStartup, Action<bool> setStartup, Action resetNeeds, Action<string> switchPet)
         {
             Form f = new Form();
             f.Text = "Clawd settings"; f.FormBorderStyle = FormBorderStyle.FixedDialog; f.MaximizeBox = false; f.MinimizeBox = false;
@@ -114,6 +117,23 @@ namespace Clawd
             body.Padding = new Padding(18, 12, 18, 12); body.AutoScroll = true;
 
             Func<string, Label> section = t => { Label l = new Label(); l.Text = t; l.Font = new Font("Segoe UI Semibold", 10.5f); l.ForeColor = Color.FromArgb(SpeciesList.Current.Shade); l.AutoSize = true; l.Margin = new Padding(0, 10, 0, 4); return l; };
+            // which pet (the header follows the choice)
+            body.Controls.Add(section("Pet"));
+            FlowLayoutPanel pets = new FlowLayoutPanel(); pets.AutoSize = true; pets.FlowDirection = FlowDirection.LeftToRight; pets.Margin = new Padding(0, 0, 0, 4);
+            foreach (Species sp in SpeciesList.All)
+            {
+                RadioButton rb = new RadioButton(); rb.Text = sp.Name; rb.Image = Sprite.IconArt(32, sp); rb.TextImageRelation = TextImageRelation.ImageBeforeText;
+                rb.AutoSize = true; rb.Checked = sp == SpeciesList.Current; rb.Margin = new Padding(2, 2, 14, 2); rb.ImageAlign = ContentAlignment.MiddleLeft;
+                Species s0 = sp;
+                rb.CheckedChanged += (s, e) =>
+                {
+                    if (!((RadioButton)s).Checked) return;
+                    head.BackColor = Color.FromArgb(s0.Accent); pic.Image = Sprite.IconArt(48, s0); title.Text = s0.ShortName; sub.Text = s0.Tagline;
+                    switchPet(s0.Id);
+                };
+                pets.Controls.Add(rb);
+            }
+            body.Controls.Add(pets);
             body.Controls.Add(section("What he does"));
             foreach (string[] lab in Labels)
             {

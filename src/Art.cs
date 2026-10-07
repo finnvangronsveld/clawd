@@ -121,9 +121,9 @@ namespace Clawd
             hx = shx + c * ARM; hy = shy + s * ARM;
         }
 
-        public static void DrawFront(Cells g, Look L)
+        public static void DrawFront(Cells g, Look L) { DrawFront(g, L, SpeciesList.Current); }
+        public static void DrawFront(Cells g, Look L, Species sp)
         {
-            Species sp = SpeciesList.Current;
             double ox = OX + L.Wob, oy = OY;
             bool low = L.Sit || L.Squash;
             if (low) oy += 2;
@@ -235,20 +235,25 @@ namespace Clawd
         }
 
         // the app icon (also used for the .ico)
-        public static Bitmap IconArt(int size)
+        public static Bitmap IconArt(int size) { return IconArt(size, SpeciesList.Current); }
+        public static Bitmap IconArt(int size, Species sp)
         {
-            Cells g = new Cells(24, 24);
+            // draw the pet, then centre whatever he covers (tuft included) in a square
             Look L = new Look();
-            // draw a mini pet centred: reuse DrawFront on a temp canvas and copy his box
-            Cells big = new Cells(CW, CH); DrawFront(big, L);
-            for (int y = 0; y < 18; y++) for (int x = 0; x < 24; x++) g.Px[(y + 3) * 24 + x] = big.Get(OX - 1 + x, OY - 1 + y);
+            Cells big = new Cells(CW, CH); DrawFront(big, L, sp);
+            int x0 = CW, y0 = CH, x1 = -1, y1 = -1;
+            for (int y = 0; y < CH; y++) for (int x = 0; x < CW; x++) if (big.Get(x, y) != 0) { x0 = Math.Min(x0, x); x1 = Math.Max(x1, x); y0 = Math.Min(y0, y); y1 = Math.Max(y1, y); }
+            int side = Math.Max(x1 - x0 + 1, y1 - y0 + 1) + 2;
+            Cells g = new Cells(side, side);
+            int dx = (side - (x1 - x0 + 1)) / 2, dy = (side - (y1 - y0 + 1)) / 2;
+            for (int y = y0; y <= y1; y++) for (int x = x0; x <= x1; x++) g.Px[(y - y0 + dy) * side + (x - x0 + dx)] = big.Get(x, y);
             Bitmap src = g.ToBitmap();
             Bitmap dst = new Bitmap(size, size, PixelFormat.Format32bppArgb);
             using (Graphics gr = Graphics.FromImage(dst))
             {
-                gr.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor;
+                gr.InterpolationMode = size >= side ? System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor : System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
                 gr.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.Half;
-                gr.DrawImage(src, new Rectangle(0, 0, size, size), new Rectangle(0, 0, 24, 24), GraphicsUnit.Pixel);
+                gr.DrawImage(src, new Rectangle(0, 0, size, size), new Rectangle(0, 0, side, side), GraphicsUnit.Pixel);
             }
             return dst;
         }

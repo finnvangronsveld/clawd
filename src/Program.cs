@@ -37,7 +37,13 @@ namespace Clawd
             Verbose = Array.IndexOf(args, "--verbose") >= 0;
             int mi = Array.IndexOf(args, "--mode"); string forceMode = mi >= 0 && mi + 1 < args.Length ? args[mi + 1] : null;
             string suffix = test ? "Test" : "";
-            if (test) LogFile = "clawd-test.log";
+            if (test)
+            {
+                LogFile = "clawd-test.log";
+                // test instances never touch the real settings: --data <dir>, or a temp folder
+                int di = Array.IndexOf(args, "--data");
+                Store.Dir = di >= 0 && di + 1 < args.Length ? args[di + 1] : Path.Combine(Path.GetTempPath(), "ClawdTestData");
+            }
 
             bool created;
             Mutex mutex = new Mutex(true, @"Local\ClawdDesktopPet" + suffix, out created);
@@ -51,6 +57,9 @@ namespace Clawd
 
             cfg = new Settings(); cfg.Load();
             needs = new Needs(); needs.Load();
+            int pi = Array.IndexOf(args, "--pet"); if (pi >= 0 && pi + 1 < args.Length) cfg.Pet = SpeciesList.Get(args[pi + 1]).Id;
+            SpeciesList.Current = SpeciesList.Get(cfg.Pet);
+            if (Verbose) Log("pet " + SpeciesList.Current.Id + " (settings said " + cfg.Pet + ")");
             if (!test) try { EnsureShortcut(StartMenuLink, false); if (File.Exists(StartupLink)) EnsureShortcut(StartupLink, false); } catch { }
 
             pet = new Pet(cfg, needs);
@@ -97,7 +106,7 @@ namespace Clawd
         static void ShowSettings()
         {
             if (settingsForm != null && !settingsForm.IsDisposed) { settingsForm.Activate(); return; }
-            settingsForm = cfg.BuildForm(() => File.Exists(StartupLink), on => { try { if (on) EnsureShortcut(StartupLink, true); else File.Delete(StartupLink); } catch { } }, () => needs.Reset());
+            settingsForm = cfg.BuildForm(() => File.Exists(StartupLink), on => { try { if (on) EnsureShortcut(StartupLink, true); else File.Delete(StartupLink); } catch { } }, () => needs.Reset(), id => pet.SwitchTo(SpeciesList.Get(id)));
             settingsForm.Show();
         }
 

@@ -17,7 +17,7 @@ namespace Clawd
         readonly Random rng = new Random();
         readonly List<Particle> parts = new List<Particle>();
         readonly Bubble bub = new Bubble();
-        readonly Settings cfg; readonly Needs needs; readonly Media media; readonly Effects fx = new Effects(); readonly Cloud cloud = new Cloud();
+        readonly Settings cfg; readonly Needs needs; readonly Media media; readonly Effects fx = new Effects(); readonly Cloud cloud = new Cloud(); readonly Picker picker = new Picker();
         readonly List<FoodItem> foods = new List<FoodItem>();
         public Action OpenSettings, Quit;
 
@@ -29,7 +29,7 @@ namespace Clawd
         // platform (a window he's standing on)
         IntPtr plat = IntPtr.Zero; Native.RECT platR; bool havePlatR, walkOff;
         // looks
-        int blink, nextBlink = 200, shake;
+        int blink, nextBlink = 200, shake, tuftT;
         // input
         bool drag, moved; double grabDX, grabDY, dvx, dvy; Point downPt, lastCur; readonly List<int> clicks = new List<int>();
         Point cur; double cdx, cdy, cdist; int lookEye; bool lookUp, overBody, curMoved;
@@ -64,6 +64,7 @@ namespace Clawd
             R.Body.MouseMove += (s, e) => MouseMoveH();
             R.Body.MouseUp += (s, e) => MouseUpH(e);
             R.Body.Cursor = Cursors.Hand;
+            picker.Chosen = sp => SwitchTo(sp);
             R.Body.AllowDrop = true;
             R.Body.DragEnter += (s, e) =>
             {
@@ -157,7 +158,8 @@ namespace Clawd
         {
             if (e.Button == MouseButtons.Right)
             {
-                if (cloud.Open || Tick - cloud.ClosedAt < 10) cloud.Close(Tick); else OpenMenu();
+                if (picker.Open || Tick - picker.ClosedAt < 10) picker.Close(Tick);
+                else if (cloud.Open || Tick - cloud.ClosedAt < 10) cloud.Close(Tick); else OpenMenu();
                 return;
             }
             if (e.Button != MouseButtons.Left || !drag) return;
@@ -197,6 +199,8 @@ namespace Clawd
             if (cfg.WebSwing) items.Add(new MenuItem("Web-swing!", () => Set("suitup")));
             if (cfg.Smash) items.Add(new MenuItem("Smash the laptop", () => { parts.Clear(); Set("smash"); }));
             items.Add(MenuItem.Separator());
+            items.Add(new MenuItem("Do your thing!", DoSignature));
+            items.Add(new MenuItem("Change pet...", () => picker.Show(new PointF((float)X, (float)CY(Sprite.OY - 2)), W.Work, S)));
             items.Add(new MenuItem("Settings...", () => { if (OpenSettings != null) OpenSettings(); }));
             items.Add(new MenuItem("Bye, " + SpeciesList.Current.ShortName, () => { if (Quit != null) Quit(); }));
             double[] nd = cfg.Needs ? new[] { needs.Fullness, needs.Energy, needs.Fun, needs.Love } : null;
@@ -211,6 +215,24 @@ namespace Clawd
             foods.Add(f);
             Chat(Pick(new[] { "ooh, food!", "for me?!", "snack!!" }), 70);
         }
+        // ---------- changing pets ----------
+        Species pending;
+        public void SwitchTo(Species sp)
+        {
+            cfg.Pet = sp.Id; cfg.Save();
+            if (sp == SpeciesList.Current) { Say("that's me!", 80); return; }
+            // cancel whatever he was doing, cleanly
+            cloud.Close(Tick); picker.Close(Tick); fx.WebOff();
+            suit = false; rot = 0; eating = null; napping = false; thrown = false; drag = false;
+            if (Mode == "smash") parts.Clear();
+            pending = sp; Set("switch");
+        }
+        void DoSignature()
+        {
+            string m = SpeciesList.Current.SignatureMode;
+            if (m == "smash") parts.Clear();
+            Set(m, m == "dance" ? 340 : 0);
+        }
         public void Poked() { cloud.Close(Tick); if (!drag) { Set("wave"); poked = true; } }
         bool poked;
 
@@ -219,7 +241,7 @@ namespace Clawd
         {
             Tick++; T++;
             if (Tick == 1 && TestX >= 0) X = TestX;
-            if (Tick == 90 && ForceMode != null) { if (ForceMode == "food") SpawnFood(false); else if (ForceMode == "menu") OpenMenu(); else Set(ForceMode, 600); }
+            if (Tick == 90 && ForceMode != null) { if (ForceMode == "food") SpawnFood(false); else if (ForceMode == "menu") OpenMenu(); else if (ForceMode == "picker") picker.Show(new PointF((float)X, (float)CY(Sprite.OY - 2)), W.Work, S); else if (ForceMode == "switch") SwitchTo(SpeciesList.All[SpeciesList.All.IndexOf(SpeciesList.Current) == 0 ? 1 : 0]); else if (ForceMode == "signature") DoSignature(); else Set(ForceMode, 600); }
             if (ForceMode == "watch" || ForceMode == "paused") { videoSeen = Tick; videoRect = W.Work; }
             if (Tick % 10 == 0 || drag) W.Update(X, Y);
 
@@ -253,12 +275,15 @@ namespace Clawd
                     rot = Math.Max(-35, Math.Min(35, -dvx * 2.2));       // dangles like he's being carried
                 }
             }
-            else if (cloud.Open)
+            else if (cloud.Open || picker.Open)
             {
                 L.EyeStyle = "up"; rot = 0;
                 if (Mode == "sleep") Set("idle", 60);
                 Rectangle body = new Rectangle(R.Body.SX, R.Body.SY, R.Body.Surf.W, R.Body.Surf.H);
-                if (Native.AnyMouseButtonDown() && !cloud.Bounds.Contains(cur) && !body.Contains(cur)) cloud.Close(Tick);
+                bool outside = Native.AnyMouseButtonDown() && !body.Contains(cur);
+                if (cloud.Open && outside && !cloud.Bounds.Contains(cur)) cloud.Close(Tick);
+                if (picker.Open && ((outside && !picker.Bounds.Contains(cur)) || Native.EscDown())) picker.Close(Tick);
+                picker.Tick();
             }
             else
             {
@@ -272,7 +297,7 @@ namespace Clawd
                 if (X > maxX) { X = maxX; Dir = -1; VX = -Math.Abs(VX) * (thrown ? 0.6 : 1); spinV = -spinV * 0.6; }
                 if (Mode != "fall" && Mode != "swing" && Mode != "trick" && Y > ground) Y = ground;
             }
-            L.Suit = suit; L.Face = Dir;
+            L.Suit = suit; L.Face = Dir; if (tuftT > 0) { tuftT--; L.TuftLift = tuftT > 10 ? 2 : (tuftT > 4 ? 1 : 0); }
             if (flashT > 0) flashT--;
             if (recoilT > 0) recoilT--;
             if (L.Gun) { L.Flash = flashT > 0; L.Recoil = recoilT > 0; }
