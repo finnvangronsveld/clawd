@@ -2,71 +2,109 @@
 
 A little orange pixel buddy who lives on your Windows desktop.
 
-<p align="center"><img src="docs/clawd.gif" alt="Clawd walking, waving, typing, thinking, dancing, smashing his laptop, watching a movie with popcorn, getting mad when it is paused, and napping"></p>
+<p align="center"><img src="docs/clawd.gif" alt="Clawd walking in, waving, typing along, thinking, eating a cookie, dancing, aiming his pellet gun, pulling a 360 no-scope, climbing a window, watching a video with popcorn, getting mad when it's paused, smashing his laptop, and napping"></p>
 
-He walks along your taskbar and climbs onto your windows. When you type, he types along on his tiny laptop. When you watch a video, he grabs popcorn and watches with you. Once in a while he smashes his laptop in frustration.
+He walks along your taskbar and climbs onto your windows. When you type, he types along on his tiny laptop. When you watch a video, he grabs popcorn and watches with you. He gets hungry, tired and bored, so feed him, pet him and play with him. Once in a while he smashes his laptop in frustration.
 
 ## Install
 
 1. **[Download Clawd](https://github.com/finnvangronsveld/clawd/releases/latest/download/Clawd.zip)** and unzip it anywhere.
 2. Double-click **`Install Clawd.cmd`**.
 
-That's it. You don't need admin rights or anything else installed. He appears at the bottom of your screen and starts with Windows from then on.
+You don't need admin rights or anything else installed: Clawd is a single small `Clawd.exe` (about 130 KB). He appears at the bottom of your screen and starts with Windows; you can turn that off in his settings.
 
 - **Bring him back:** if you send him away, start **Clawd** from the Start menu.
 - **Uninstall:** use **Settings › Apps**, or double-click `Uninstall Clawd.cmd`.
+- **No install:** you can also just double-click `Clawd.exe`. He adds himself to the Start menu.
 
-> Windows might ask whether you want to run a file downloaded from the internet. Choose **Run**. Clawd is a single readable PowerShell script ([`clawd.ps1`](clawd.ps1)), so you can see exactly what he does.
+> Clawd isn't code-signed, so Windows SmartScreen may say "Windows protected your PC". Click **More info → Run anyway**. The full source is in this repo.
 
-## Things to do with him
+## Playing with him
 
 | Do this | He does |
 |---|---|
 | Left-click | Hops |
 | Click 4× quickly | Gets dizzy |
-| Drag | Flails ("wheee!") and falls when you let go. You can drop him onto a window. |
+| Drag him | Dangles and flails ("wheee!") |
+| **Throw him** | Flies, spins, bounces off the screen edges, and lands dizzy after a big throw. You can land him on a window. |
 | Rub the cursor over him | Blushes and floats hearts |
 | Bring the cursor near | Waves hi |
-| Right-click | Opens his thought-cloud menu |
-| Type | He pulls out his laptop and types along |
+| Right-click | Opens his thought-cloud menu, with his mood bars on top |
+| **Give him a snack** (menu) | A cookie, pizza, apple or donut drops in. Drag it to him, or he walks over and eats it in three bites. |
+| **Drop a file on him** | Chews on it and has opinions ("a pdf... very official", "I'm NOT running that"). Your file isn't touched. |
+| Type | He pulls out his laptop and types along, one hand per key |
 | Pause typing | He thinks: spinner plus "Clauding...", "Percolating..." and so on |
-| Watch a video (YouTube, Netflix, Twitch, VLC, ...) | He picks a seat under it, sits with his back to you, eats popcorn in the light of the screen and comments on what you're watching |
+| Watch a video (YouTube, Netflix, Twitch, VLC, ...) | He picks a seat under it, sits with his back to you in the glow of the screen, eats popcorn and comments |
 | Pause the video | He turns around and stomps ("hey! I was watching!"), then sulks until you press play |
-| Stay idle for 60 s | He yawns and falls asleep (Zzz) |
+| Play music (Spotify etc.) | Headphones on, bopping along |
+| Stay away for a minute | He yawns and naps |
 
-He also does things on his own:
+### Moods
+
+He has four needs: **food, energy, fun and love**. You can see them in his menu.
+
+- They slowly drain and are remembered between sessions.
+- **Hungry:** he complains and walks slower. Give him a snack.
+- **Tired:** he naps, and wears a nightcap late at night.
+- **Bored:** he comes looking for attention.
+- **Loved:** heart eyes when he looks at you.
+
+### He notices your PC
+
+- **Low battery:** "plug me in?". Plugging in: "ahh, power!".
+- **Busy CPU:** he fans himself and sweats.
+- **Copying something:** a little paper floats down and he catches it.
+- **Late at night:** "go to sleep, human".
+- **Coming back after a long break:** "good morning!".
+
+### On his own, he also
+
 - chases your cursor
 - dances
 - takes coffee breaks
 - thinks hard
-- spots any window he can reach, runs over and jumps onto it, then rides along when you move it
-- shoots tiny pixel pellets at your cursor, aiming in every direction ("gotcha!" / "dang it!")
-- pulls off trickshots: 360 no-scopes, no-look shots and ricochets off the floor ("TRICKSHOT!!")
-- suits up as a web-slinger and swings across your screen, shooting webs at the screen's edges, or at your cursor if it's above him (move it and you drag him along)
+- spots any window he can reach, runs over, jumps onto it and rides along when you move it
+- shoots tiny pellets at your cursor, aiming in every direction
+- pulls off trickshots: 360 no-scopes, no-look shots and ricochets
+- suits up as a web-slinger and swings across the screen, webbing onto the edges or onto your cursor
 - smashes his laptop ("fixed it.")
 
-He doesn't show up in the taskbar or in Alt+Tab.
+He never steals focus from what you're doing, and he doesn't show up in the taskbar or Alt+Tab.
+
+### Settings
+
+Right-click him and choose **Settings...**. From there you can:
+
+- turn individual things on or off: the gun, trickshots, the web-slinger, laptop smashing, movie night, the pause tantrum, commentary, typing along, climbing, needs, PC reactions and music
+- set his **size**, how **active** he is and how **chatty** he is
+- turn starting with Windows on or off
+- reset his needs
 
 ## Privacy
 
 Everything stays on your PC:
 
-- **Typing:** Clawd only counts how many keys went down, never which keys.
-- **Videos:** he checks the title of the window in front to notice a video, and compares it against a list of video sites and players. He reads whether media is playing or paused from Windows' own media controls (the volume-key overlay).
+- **Typing:** he only counts how many keys went down, never which keys.
+- **Videos:** he checks the title of the window in front to notice a video. He reads playing/paused from Windows' own media controls (the volume-key overlay).
+- **PC reactions:** battery level, CPU load and "something was copied" events. He never reads what you copied.
+- **Dropped files:** he only looks at the file name.
+- **Saved data:** settings and needs are kept in `%APPDATA%\Clawd`.
 
-Nothing is stored or sent anywhere.
+Nothing is sent anywhere.
 
-## For tinkerers
+## Building from source
 
-Run him straight from a clone:
+You only need Windows. The build uses the C# compiler that comes with every Windows install (.NET Framework 4.x):
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -STA -File .\clawd.ps1
+powershell -ExecutionPolicy Bypass -File build.ps1
 ```
 
-Rebuild the GIF above. This renders a scripted demo off-screen, then needs Python with Pillow:
+This produces `Clawd.exe`. To re-render the GIF above, run Clawd's scripted demo off-screen, then build the GIF with Python and Pillow:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -STA -File .\clawd.ps1 -RenderFrames .\frames
+.\Clawd.exe --render-frames .\frames
 python tools\make_gif.py .\frames docs\clawd.gif
 ```
+
+Clawd v1 (a single PowerShell script) lives on in `legacy/clawd-v1.ps1`.

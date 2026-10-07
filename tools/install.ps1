@@ -1,5 +1,5 @@
 # Installs Clawd for the current user (no admin needed) and starts him.
-#   - copies him to %LOCALAPPDATA%\Programs\Clawd
+#   - copies Clawd.exe to %LOCALAPPDATA%\Programs\Clawd
 #   - Start menu entry + "start with Windows" + an entry in Settings > Apps for uninstalling
 param([string]$Dest = (Join-Path $env:LOCALAPPDATA 'Programs\Clawd'),
       [string]$MenuDir = [Environment]::GetFolderPath('Programs'),
@@ -13,33 +13,30 @@ try {
     $src  = Split-Path $PSScriptRoot -Parent
     $dest = $Dest
 
-    # stop any Clawd that's already running (he'll be restarted from the new place)
-    if (-not $Quiet) { Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" |
-        Where-Object { $_.CommandLine -match 'clawd\.ps1' -and $_.ProcessId -ne $PID } |
-        ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue } }
-    Start-Sleep -Milliseconds 500
+    # stop any Clawd that's already running (v2 exe, or the old v1 script)
+    if (-not $Quiet) {
+        Get-Process Clawd -ErrorAction SilentlyContinue | Stop-Process -Force
+        Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" |
+            Where-Object { $_.CommandLine -match 'clawd\.ps1' -and $_.ProcessId -ne $PID } |
+            ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+        Start-Sleep -Milliseconds 600
+    }
 
     New-Item -ItemType Directory -Force $dest | Out-Null
-    Copy-Item (Join-Path $src 'clawd.ps1') $dest -Force
-    Copy-Item (Join-Path $src 'clawd.ico') $dest -Force
+    Copy-Item (Join-Path $src 'Clawd.exe') $dest -Force
     Copy-Item (Join-Path $PSScriptRoot 'uninstall.ps1') $dest -Force
+    # clean up a v1 install in the same place
+    foreach ($old in 'clawd.ps1', 'launch.vbs', 'clawd.ico') { $p = Join-Path $dest $old; if (Test-Path $p) { Remove-Item -LiteralPath $p -Force } }
     Get-ChildItem $dest | Unblock-File          # files from a downloaded zip are marked as "from the internet"
 
-    $ps1 = Join-Path $dest 'clawd.ps1'
-    $ico = Join-Path $dest 'clawd.ico'
-    $vbs = Join-Path $dest 'launch.vbs'
-    $cmd = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -STA -File ""' + $ps1 + '""'
-    'CreateObject("WScript.Shell").Run "' + $cmd + '", 0, False' | Set-Content -Path $vbs -Encoding ASCII
-
+    $exe = Join-Path $dest 'Clawd.exe'
     $sh = New-Object -ComObject WScript.Shell
-    foreach ($lnkPath in (Join-Path $MenuDir 'Clawd.lnk'),
-                         (Join-Path $StartupDir 'Clawd.lnk')) {
+    foreach ($lnkPath in (Join-Path $MenuDir 'Clawd.lnk'), (Join-Path $StartupDir 'Clawd.lnk')) {
         $l = $sh.CreateShortcut($lnkPath)
-        $l.TargetPath = Join-Path $env:WINDIR 'System32\wscript.exe'
-        $l.Arguments = '"' + $vbs + '"'
+        $l.TargetPath = $exe
         $l.WorkingDirectory = $dest
-        $l.IconLocation = "$ico,0"
-        $l.Description = 'Clawd, the little orange desktop pet'
+        $l.IconLocation = "$exe,0"
+        $l.Description = 'Clawd, the little orange desktop buddy'
         $l.Save()
     }
 
@@ -48,7 +45,7 @@ try {
     New-Item -Path $key -Force | Out-Null
     $un = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' + (Join-Path $dest 'uninstall.ps1') + '"'
     $props = @{
-        DisplayName = 'Clawd'; DisplayIcon = $ico; Publisher = 'finnvangronsveld'; DisplayVersion = '1.0'
+        DisplayName = 'Clawd'; DisplayIcon = "$exe,0"; Publisher = 'finnvangronsveld'; DisplayVersion = '2.0'
         InstallLocation = $dest; UninstallString = $un; QuietUninstallString = $un
         URLInfoAbout = 'https://github.com/finnvangronsveld/clawd'
     }
@@ -57,12 +54,12 @@ try {
     New-ItemProperty -Path $key -Name NoRepair -Value 1 -PropertyType DWord -Force | Out-Null
 
     if ($Quiet) { return }
-    Start-Process wscript.exe -ArgumentList ('"' + $vbs + '"')
+    Start-Process $exe
 
     [System.Windows.Forms.MessageBox]::Show(
         "Clawd is installed! Look at the bottom of your screen.`n`n" +
-        "- Right-click him for his menu`n- He starts with Windows (you can turn that off in his menu)`n" +
-        "- Find him in the Start menu as 'Clawd' if you ever send him away`n`n" +
+        "- Right-click him for his menu (and Settings)`n- Drag and throw him, feed him snacks, drop files on him`n" +
+        "- He starts with Windows (turn that off in Settings)`n- Find him in the Start menu as 'Clawd' if you ever send him away`n`n" +
         "Uninstall any time from Settings > Apps.",
         'Clawd', 'OK', 'Information') | Out-Null
 } catch {
