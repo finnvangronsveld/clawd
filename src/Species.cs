@@ -33,7 +33,7 @@ namespace Flippy
 
     static class SpeciesList
     {
-        public static readonly List<Species> All = new List<Species> { new FlippySpecies(), new ClassicSpecies() };
+        public static readonly List<Species> All = new List<Species> { new FlippySpecies(), new FrogSpecies(), new PhoneSpecies(), new PancakeSpecies(), new ClassicSpecies() };
         public static Species Current = All[0];
         public static Species Default { get { return All[0]; } }
         public static Species Get(string id)
