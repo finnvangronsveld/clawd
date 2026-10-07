@@ -8,10 +8,33 @@ using System.Globalization;
 using System.IO;
 using System.Text;
 
-namespace Clawd
+namespace Flippy
 {
     static class DevTools
     {
+        // --make-icon <file.ico>: the default pet's icon at 16/32/48/256 px (PNG frames inside the .ico)
+        public static int MakeIcon(string path)
+        {
+            int[] sizes = { 256, 48, 32, 16 };
+            var frames = new List<byte[]>();
+            foreach (int s in sizes)
+                using (Bitmap b = Sprite.IconArt(s, SpeciesList.Default)) using (MemoryStream ms = new MemoryStream()) { b.Save(ms, ImageFormat.Png); frames.Add(ms.ToArray()); }
+            using (FileStream fs = File.Create(path)) using (BinaryWriter w = new BinaryWriter(fs))
+            {
+                w.Write((ushort)0); w.Write((ushort)1); w.Write((ushort)sizes.Length);
+                int off = 6 + 16 * sizes.Length;
+                for (int i = 0; i < sizes.Length; i++)
+                {
+                    byte dim = (byte)(sizes[i] >= 256 ? 0 : sizes[i]);
+                    w.Write(dim); w.Write(dim); w.Write((byte)0); w.Write((byte)0); w.Write((ushort)1); w.Write((ushort)32);
+                    w.Write(frames[i].Length); w.Write(off); off += frames[i].Length;
+                }
+                foreach (byte[] f in frames) w.Write(f);
+            }
+            Console.WriteLine("icon -> " + path);
+            return 0;
+        }
+
         public static int DumpSprites(string dir, string species)
         {
             if (species != null) SpeciesList.Current = SpeciesList.Get(species);

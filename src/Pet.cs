@@ -1,4 +1,4 @@
-// Clawd's body and senses: position, physics, input, needs, and the per-tick loop.
+// The pet's body and senses: position, physics, input, needs, and the per-tick loop.
 // Behaviours (the big mode switch) live in Behaviours.cs.
 using System;
 using System.Collections.Generic;
@@ -7,7 +7,7 @@ using System.IO;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
 
-namespace Clawd
+namespace Flippy
 {
     partial class Pet
     {

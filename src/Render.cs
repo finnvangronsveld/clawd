@@ -1,4 +1,4 @@
-// Turns the cell art into what you see: Clawd crisp and scaled up (with squash/stretch and rotation) in one
+// Turns the cell art into what you see: the pet crisp and scaled up (with squash/stretch and rotation) in one
 // window, and the soft stuff (shadow, screen glow, particles, speech bubble) in a click-through window behind him.
 using System;
 using System.Collections.Generic;
@@ -7,7 +7,7 @@ using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Drawing.Text;
 
-namespace Clawd
+namespace Flippy
 {
     class Particle
     {

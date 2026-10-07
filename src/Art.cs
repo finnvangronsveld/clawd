@@ -1,4 +1,4 @@
-// Clawd's pixel art. Everything is drawn into a small grid of "cells" (one cell = one sprite pixel);
+// The pets' pixel art. Everything is drawn into a small grid of "cells" (one cell = one sprite pixel);
 // the renderer scales that up crisply and adds the soft stuff (shadow, glow, particles, bubbles).
 using System;
 using System.Collections.Generic;
@@ -6,7 +6,7 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 
-namespace Clawd
+namespace Flippy
 {
     static class Pal
     {

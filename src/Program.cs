@@ -1,4 +1,4 @@
-// Clawd v2 entry point: single instance, the 60 Hz loop, shortcuts, settings window.
+// Flippy entry point: single instance, the 60 Hz loop, shortcuts, settings window.
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -6,17 +6,17 @@ using System.Reflection;
 using System.Threading;
 using System.Windows.Forms;
 
-[assembly: AssemblyTitle("Clawd")]
-[assembly: AssemblyProduct("Clawd")]
-[assembly: AssemblyDescription("A little orange desktop buddy")]
-[assembly: AssemblyVersion("2.0.0.0")]
-[assembly: AssemblyFileVersion("2.0.0.0")]
+[assembly: AssemblyTitle("Flippy")]
+[assembly: AssemblyProduct("Flippy")]
+[assembly: AssemblyDescription("A little desktop buddy")]
+[assembly: AssemblyVersion("2.1.0.0")]
+[assembly: AssemblyFileVersion("2.1.0.0")]
 
-namespace Clawd
+namespace Flippy
 {
     static class Program
     {
-        public const string Version = "2.0";
+        public const string Version = "2.1";
         static Pet pet;
         static Settings cfg;
         static Needs needs;
@@ -30,6 +30,7 @@ namespace Clawd
             Application.SetCompatibleTextRenderingDefault(false);
 
             if (args.Length >= 2 && args[0] == "--render-frames") { return Demo.Render(args[1]); }
+            if (args.Length >= 2 && args[0] == "--make-icon") { return DevTools.MakeIcon(args[1]); }
             if (args.Length >= 2 && args[0] == "--dump-sprites") { return DevTools.DumpSprites(args[1], args.Length >= 4 && args[2] == "--species" ? args[3] : null); }
 
             // test switches (for development): --test runs a second instance, --mode X forces a behaviour, --verbose logs
@@ -39,20 +40,24 @@ namespace Clawd
             string suffix = test ? "Test" : "";
             if (test)
             {
-                LogFile = "clawd-test.log";
+                LogFile = "flippy-test.log";
                 // test instances never touch the real settings: --data <dir>, or a temp folder
                 int di = Array.IndexOf(args, "--data");
-                Store.Dir = di >= 0 && di + 1 < args.Length ? args[di + 1] : Path.Combine(Path.GetTempPath(), "ClawdTestData");
+                Store.Dir = di >= 0 && di + 1 < args.Length ? args[di + 1] : Path.Combine(Path.GetTempPath(), "FlippyTestData");
             }
 
             bool created;
-            Mutex mutex = new Mutex(true, @"Local\ClawdDesktopPet" + suffix, out created);
+            Mutex mutex = new Mutex(true, @"Local\FlippyDesktopPet" + suffix, out created);
             if (!created)
             {
-                try { EventWaitHandle.OpenExisting(@"Local\ClawdPoke" + suffix).Set(); } catch { }
+                try { EventWaitHandle.OpenExisting(@"Local\FlippyPoke" + suffix).Set(); } catch { }
                 return 0;
             }
-            EventWaitHandle poke = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\ClawdPoke" + suffix);
+            EventWaitHandle poke = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\FlippyPoke" + suffix);
+            // coming from the old name: settings across, old copy stopped (test runs only migrate a fake --old-data folder)
+            int od = Array.IndexOf(args, "--old-data");
+            if (test) { if (od >= 0 && od + 1 < args.Length) Migration.CopySettings(Store.Dir, args[od + 1]); }
+            else { Migration.StopOldInstance(); Migration.CopySettings(Store.Dir, Migration.OldDataDir); }
             Native.timeBeginPeriod(1);
 
             cfg = new Settings(); cfg.Load();
@@ -60,7 +65,14 @@ namespace Clawd
             int pi = Array.IndexOf(args, "--pet"); if (pi >= 0 && pi + 1 < args.Length) cfg.Pet = SpeciesList.Get(args[pi + 1]).Id;
             SpeciesList.Current = SpeciesList.Get(cfg.Pet);
             if (Verbose) Log("pet " + SpeciesList.Current.Id + " (settings said " + cfg.Pet + ")");
-            if (!test) try { EnsureShortcut(StartMenuLink, false); if (File.Exists(StartupLink)) EnsureShortcut(StartupLink, false); } catch { }
+            if (!test)
+                try
+                {
+                    Migration.Shortcuts(Path.GetDirectoryName(StartMenuLink), Path.GetDirectoryName(StartupLink), p => EnsureShortcut(p, true), LinkName);
+                    EnsureShortcut(StartMenuLink, false);
+                    if (File.Exists(StartupLink)) EnsureShortcut(StartupLink, false);
+                }
+                catch { }
 
             pet = new Pet(cfg, needs);
             if (test) pet.TestX = Array.IndexOf(args, "--x") >= 0 ? int.Parse(args[Array.IndexOf(args, "--x") + 1]) : -1;
@@ -96,7 +108,7 @@ namespace Clawd
 
         static int logged;
         public static bool Verbose;
-        public static string LogFile = "clawd.log";
+        public static string LogFile = "flippy.log";
         public static void Log(string s)
         {
             if (logged++ > (Verbose ? 5000 : 20)) return;
@@ -111,8 +123,9 @@ namespace Clawd
         }
 
         // ---------- shortcuts ----------
-        static string StartMenuLink { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "Clawd.lnk"); } }
-        static string StartupLink { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Startup), "Clawd.lnk"); } }
+        const string LinkName = "Flippy.lnk";
+        static string StartMenuLink { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), LinkName); } }
+        static string StartupLink { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Startup), LinkName); } }
         public static void EnsureShortcut(string path, bool force)
         {
             string exe = Application.ExecutablePath;
@@ -124,7 +137,7 @@ namespace Clawd
             if (!force && File.Exists(path) && string.Equals(current, exe, StringComparison.OrdinalIgnoreCase)) return;
             lt.InvokeMember("TargetPath", BindingFlags.SetProperty, null, lnk, new object[] { exe });
             lt.InvokeMember("WorkingDirectory", BindingFlags.SetProperty, null, lnk, new object[] { Path.GetDirectoryName(exe) });
-            lt.InvokeMember("Description", BindingFlags.SetProperty, null, lnk, new object[] { "Clawd, the little orange desktop buddy" });
+            lt.InvokeMember("Description", BindingFlags.SetProperty, null, lnk, new object[] { "Flippy, your little desktop buddy" });
             lt.InvokeMember("IconLocation", BindingFlags.SetProperty, null, lnk, new object[] { exe + ",0" });
             lt.InvokeMember("Save", BindingFlags.InvokeMethod, null, lnk, null);
         }

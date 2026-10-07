@@ -7,7 +7,7 @@ using System.Drawing.Drawing2D;
 using System.Drawing.Text;
 using System.Windows.Forms;
 
-namespace Clawd
+namespace Flippy
 {
     class Picker
     {

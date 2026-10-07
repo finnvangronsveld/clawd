@@ -1,10 +1,10 @@
-// Snacks you can give Clawd: little pixel-art items in their own draggable window, with gravity.
+// Snacks you can give the pet: little pixel-art items in their own draggable window, with gravity.
 using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 
-namespace Clawd
+namespace Flippy
 {
     static class Food
     {
@@ -46,7 +46,7 @@ namespace Clawd
         public static string Pick(Random rng) { return Kinds[rng.Next(Kinds.Length)]; }
     }
 
-    // A snack lying around (or being dragged by you). Clawd eats it when he reaches it.
+    // A snack lying around (or being dragged by you). The pet eats it when he reaches it.
     class FoodItem
     {
         public string Kind; public double X, Y, VX, VY; public bool Dragging, Grounded, Gone; public double Left = 1.0;

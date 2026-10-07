@@ -1,4 +1,4 @@
-// Settings + needs, saved as simple key=value files in %APPDATA%\Clawd. Nothing leaves the PC.
+// Settings + needs, saved as simple key=value files in %APPDATA%\Flippy. Nothing leaves the PC.
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -6,11 +6,11 @@ using System.Globalization;
 using System.IO;
 using System.Windows.Forms;
 
-namespace Clawd
+namespace Flippy
 {
     static class Store
     {
-        public static string Dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Clawd");
+        public static string Dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Flippy");
         public static Dictionary<string, string> Load(string name)
         {
             var d = new Dictionary<string, string>();
@@ -102,7 +102,7 @@ namespace Clawd
         public Form BuildForm(Func<bool> getStartup, Action<bool> setStartup, Action resetNeeds, Action<string> switchPet)
         {
             Form f = new Form();
-            f.Text = "Clawd settings"; f.FormBorderStyle = FormBorderStyle.FixedDialog; f.MaximizeBox = false; f.MinimizeBox = false;
+            f.Text = "Flippy settings"; f.FormBorderStyle = FormBorderStyle.FixedDialog; f.MaximizeBox = false; f.MinimizeBox = false;
             f.StartPosition = FormStartPosition.CenterScreen; f.BackColor = Color.FromArgb(252, 248, 244); f.AutoScaleMode = AutoScaleMode.Dpi;
             f.Font = new Font("Segoe UI", 9.75f); f.ClientSize = new Size(440, 640); f.ShowIcon = true;
             try { f.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }

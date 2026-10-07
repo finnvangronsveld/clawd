@@ -1,10 +1,10 @@
-// What Clawd does: triggers (things that grab his attention) and every behaviour, one tick at a time.
+// What the pet does: triggers (things that grab his attention) and every behaviour, one tick at a time.
 // Timings are in ticks at 60 per second.
 using System;
 using System.Drawing;
 using System.IO;
 
-namespace Clawd
+namespace Flippy
 {
     partial class Pet
     {

@@ -1,10 +1,8 @@
 # build output
-Clawd.exe
+Flippy.exe
+bin/
 dist/
 frames/
-# generated per machine (v1)
-launch.vbs
-clawd.log
-t_*.ps1
-t_*.log
-bin/
+# logs
+flippy.log
+flippy-test.log

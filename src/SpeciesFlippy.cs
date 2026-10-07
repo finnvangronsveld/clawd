@@ -4,7 +4,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Clawd
+namespace Flippy
 {
     class FlippySpecies : Species
     {

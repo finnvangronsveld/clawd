@@ -1,7 +1,7 @@
-// Where Clawd is: which monitor, how big he should be there (DPI + size setting), where the floor is.
+// Where the pet is: which monitor, how big he should be there (DPI + size setting), where the floor is.
 using System;
 
-namespace Clawd
+namespace Flippy
 {
     class World
     {

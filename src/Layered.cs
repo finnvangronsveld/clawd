@@ -6,7 +6,7 @@ using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Windows.Forms;
 
-namespace Clawd
+namespace Flippy
 {
     // A drawing surface backed by a 32bpp premultiplied DIB section (grows as needed, never shrinks).
     class Surface : IDisposable
@@ -68,7 +68,7 @@ namespace Clawd
             FormBorderStyle = FormBorderStyle.None;
             ShowInTaskbar = false;
             StartPosition = FormStartPosition.Manual;
-            Text = "Clawd";
+            Text = "Flippy";
         }
         protected override CreateParams CreateParams
         {

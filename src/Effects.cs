@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 
-namespace Clawd
+namespace Flippy
 {
     class Pellet
     {

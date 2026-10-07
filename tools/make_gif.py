@@ -1,4 +1,4 @@
-"""Build docs/clawd.gif from frames rendered by `Clawd.exe --render-frames <dir>`.
+"""Build docs/flippy.gif from frames rendered by `Flippy.exe --render-frames <dir>`.
 
 Usage:  python tools/make_gif.py <frames_dir> <out.gif>
 The frames are a little fake desktop (opaque), rendered at 30 fps. One shared palette is picked

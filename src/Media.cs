@@ -5,7 +5,7 @@ using System.Collections;
 using System.Linq;
 using System.Reflection;
 
-namespace Clawd
+namespace Flippy
 {
     class Media
     {

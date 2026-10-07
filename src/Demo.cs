@@ -1,5 +1,5 @@
 // Off-screen demo for the README: a scripted show on a tiny fake desktop, drawn by the real renderer.
-//   Clawd.exe --render-frames <dir>      then   python tools/make_gif.py <dir> docs/clawd.gif
+//   Flippy.exe --render-frames <dir>      then   python tools/make_gif.py <dir> docs/flippy.gif
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -7,7 +7,7 @@ using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.IO;
 
-namespace Clawd
+namespace Flippy
 {
     static class Demo
     {
