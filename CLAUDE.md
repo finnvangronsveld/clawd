@@ -3,11 +3,77 @@
 Flippy is a pixel-art desktop pet for Windows. The app is a C# Windows Forms program (`src/*.cs` → `Flippy.exe`), built with the .NET Framework 4.x compiler that ships with every Windows install. Pets are **species** (data plus drawing code), so every behaviour works for every pet:
 
 - **Flip** (a flip phone), **Hopper** (a frog) and **Flapjack** (a pancake) are the "flip" pets, after Flipforward. Flip is the default.
-- "Clawd (classic)" is the second pet.
+- **Clawd (classic)**, the original orange pet, is the fourth. (The teal blob that was briefly called Flippy is retired.)
 
 Public repo: https://github.com/finnvangronsveld/flippy
 
-**Keep this file and `README.md` up to date whenever behaviour changes.** The owner asked for this explicitly.
+**Keep this file and `README.md` up to date whenever behaviour changes.** The owner asked for this explicitly: he updates the Flippy website from this file, so the "For the website" section below must always match the latest release.
+
+Local checkout: `C:\Users\finnv\PROJECTS\Flippy` (renamed from `PROJECTS\Clawd`). The owner's running copy is `PROJECTS\Flippy\Flippy.exe`, and his Start menu and Startup shortcuts point there.
+
+## For the website (current facts)
+
+- **Name:** Flippy, after the owner's brand Flipforward. Tagline: "A little pixel buddy who lives on your Windows desktop."
+- **Latest version:** 2.3 (`Program.Version`). Releases: https://github.com/finnvangronsveld/flippy/releases
+- **Download (always the latest):** https://github.com/finnvangronsveld/flippy/releases/latest/download/Flippy.zip
+  - Unzip it and double-click `Install Flippy.cmd`.
+  - Needs Windows 10 or 11. No admin rights, nothing else to install.
+  - It's a single small `Flippy.exe` (about 175 KB).
+- **Not code-signed:** SmartScreen may warn. Click "More info", then "Run anyway".
+- **Demo GIF:** `docs/flippy.gif` (raw: https://raw.githubusercontent.com/finnvangronsveld/flippy/main/docs/flippy.gif). App icon: `flippy.ico`.
+- **Pets** (right-click → "Change pet...", or in Settings):
+
+  | Pet | Id | Tagline | Signature move |
+  |---|---|---|---|
+  | **Flip** (default) | `phone` | a flip phone with feelings | front flip ("flip open!") |
+  | **Hopper** | `frog` | a frog who flips | front flip |
+  | **Flapjack** | `pancake` | golden, fluffy, flippable | front flip |
+  | **Clawd (classic)** | `clawd` | the original orange buddy | smashes his laptop |
+
+- **Features** (every pet can do all of them):
+  - **Moving around:**
+    - walks along the taskbar
+    - climbs onto windows and rides along when you move them
+  - **Typing:** types along on a tiny laptop when you type, and thinks when you pause.
+  - **Media:**
+    - Movie night: he sits under a playing video with popcorn, lit from behind by the screen, and comments on it.
+    - If you pause the video, he throws a tantrum.
+    - He puts on headphones when music plays.
+  - **Handling him:**
+    - drag and throw him (physics, spins, bounces, lands dizzy)
+    - he hops when clicked, gets dizzy after 4 quick clicks, and blushes when you rub him
+  - **Food and files:**
+    - feed him snacks: a cookie, pizza, apple or donut
+    - drop a file on him and he has opinions (the file isn't touched)
+  - **Needs:**
+    - food, energy, fun and love, shown in his menu and remembered between sessions
+    - he naps when you're idle and wears a nightcap at night
+  - **PC reactions:** low battery, charging, busy CPU, copying, late at night, and coming back after a break.
+  - **On his own:**
+    - chases the cursor, dances, takes coffee breaks
+    - aims a pellet gun at your cursor and does trickshots (360 no-scope, ricochets)
+    - swings across the screen in his web-slinger suit
+    - smashes his laptop, or does his signature move
+  - **Menus:**
+    - a thought-cloud right-click menu with mood bars
+    - a settings window: pick the pet, turn each feature on or off, set size, activity and chattiness, start with Windows, reset needs
+  - **Stays out of the way:** never steals focus, and isn't in the taskbar or Alt+Tab.
+- **Privacy:** everything stays on the PC. Nothing is sent anywhere, and data lives in `%APPDATA%\Flippy`.
+  - **Typing:** counts key presses, never which keys.
+  - **Videos:** reads the title of the window in front and Windows' media play/pause state.
+  - **PC reactions:** battery, CPU and "something was copied" events, never the copied contents.
+  - **Dropped files:** looks only at the file name.
+  - **Menus:** while a menu is open, it notices mouse clicks (only where they happen) so it knows when to close.
+- **Open source:** C#, built with the compiler that ships with Windows. Public repo above.
+- **Changelog:**
+  - **2.3:** The menus (the right-click cloud and "Change pet...") now close reliably on a click outside them, on Esc, when you switch windows, or after 4 s with the cursor away.
+  - **2.2:**
+    - Flip is now the default pet, and Hopper and Flapjack were added.
+    - The blob is retired.
+    - The pet falls off a window that gets covered (Alt+Tab).
+  - **2.1:** renamed to Flippy; added the pet picker and the species system.
+  - **2.0:** rewritten as a C# app, with better graphics, throw physics, feeding and needs, PC reactions and settings.
+  - **1.x:** the original PowerShell pet (movie night, gun, trickshots, climbing, web-slinger suit).
 
 ## Layout
 
@@ -42,11 +108,21 @@ Public repo: https://github.com/finnvangronsveld/flippy
 - **Screenshots:** a plain `BitBlt`/`CopyFromScreen` skips layered windows. Use `CAPTUREBLT` (`0x40000000`).
 - **Coordinates:**
   - `X`, `Y` = his **feet** in screen pixels.
-  - The pet's 22×16 box sits at `Sprite.OX`, `Sprite.OY` in a 60×34 cell canvas. Flippy's tuft sticks out above it.
+  - The pet's 22×16 box sits at `Sprite.OX`, `Sprite.OY` in a 60×34 cell canvas. Some pets stick out above it (Flip's antenna, Flapjack's butter).
   - `S` = screen pixels per cell (from DPI and the size setting), and `K = S/3` scales speeds.
 - **Timing:** a fixed 60 ticks/s. `Draw()` skips frames when nothing changed. Any new visual must be in `Look` **and** `Look.Key()`.
 - `Look` is reset every tick, and modes set it each frame. Persistent state (`suit`, `Dir`) lives in `Pet`.
 - **Art:** draw only into `Cells` (`Rect`/`Dot`/`Glyph`), never anti-aliased. Chunky pixels, a dark outline, a light top-left edge and a shaded bottom-right.
+- **Menus close via `ClickWatch`** (in `Native.cs`):
+  - It's a low-level mouse hook (`WH_MOUSE_LL`), installed only while the cloud or the picker is open. It records where each mouse button went down.
+  - Every tick, `Pet.Step` closes the menu if any of these happened:
+    - a click outside, from `ClickWatch.ClickedOutside(body, cloud, picker)`. It checks the window handle under the point, so see-through pixels count as outside.
+    - Esc
+    - the foreground window changed
+    - the cursor has been away for 4 s
+  - `CloseMenus()` removes the hook.
+  - Don't go back to the "pressed since last call" bit of `GetAsyncKeyState`. It's shared system-wide and misses clicks.
+  - `--verbose` logs "menu opened" and "menu closed: click|esc|focus|away".
 - **Species:** behaviours never draw pet-specific pixels. Props are placed with the species' anchors (`MugSipX`, `HeldY`, `BangY`, `MaskLX`...).
 
 ## Adding a pet
@@ -65,6 +141,7 @@ Public repo: https://github.com/finnvangronsveld/flippy
 - **Test switches:** `bin\Dev.exe --test --verbose [--pet <id>] [--mode <mode>] [--x <screenX>] [--data <dir>] [--old-data <dir>]`.
   - `--test` uses its own mutex and poke event, and a **temp data folder** (`%TEMP%\FlippyTestData`, or `--data`). It never touches the real `%APPDATA%\Flippy`, and it skips the real migration and shortcut handling.
   - `--mode` takes any mode name, or `food`, `menu`, `picker`, `switch`, `signature`, `watch` or `paused`.
+  - **Menu closing:** open a menu with `--mode menu` or `picker`. Then click a dummy window that's already in front, and check the log for "menu closed: click". Send the synthetic clicks from a **DPI-aware** process, or the coordinates are off.
   - `--old-data` tests the settings migration from a fake old folder.
   - Logs go to `<data>\flippy-test.log`.
 - **Art refactors:** `--dump-sprites` before and after, then `python tools/diff_sprites.py <before> <after> <diff_out>`.
@@ -88,7 +165,7 @@ Old git history keeps the old name, and that's fine.
 
 1. Run `build.ps1` (→ `Flippy.exe`). If the default pet's art changed, also run `bin\Dev.exe --make-icon flippy.ico`.
 2. Run `bin\Dev.exe --render-frames <tmp>`, then `python tools/make_gif.py <tmp> docs/flippy.gif`.
-3. Update `README.md` and this file. Bump the version in `Program.Version`, `AssemblyVersion`/`AssemblyFileVersion` and `DisplayVersion` in `tools/install.ps1`.
+3. Update `README.md` and this file, including the "For the website" version and changelog. Bump the version in `Program.Version`, `AssemblyVersion`/`AssemblyFileVersion` and `DisplayVersion` in `tools/install.ps1`.
 4. Commit, ending the message with the Co-Authored-By line, and push.
 5. Build `dist/Flippy.zip`. It holds `Flippy.exe`, `flippy.ico`, `README.md`, both `.cmd` files and `tools/install.ps1` + `tools/uninstall.ps1`.
 6. Run `"C:\Program Files\GitHub CLI\gh.exe" release create vX.Y dist/Flippy.zip ...`. The README links `releases/latest/download/Flippy.zip`.

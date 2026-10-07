@@ -104,6 +104,7 @@ Everything stays on your PC:
 - **Videos:** he checks the title of the window in front to notice a video. He reads playing/paused from Windows' own media controls (the volume-key overlay).
 - **PC reactions:** battery level, CPU load and "something was copied" events. He never reads what you copied.
 - **Dropped files:** he only looks at the file name.
+- **Menus:** while his menu is open he notices mouse clicks (only where you clicked), so it can close when you click elsewhere.
 - **Saved data:** your settings, chosen pet and his needs are stored only in `%APPDATA%\Flippy`.
 
 Nothing is sent anywhere.

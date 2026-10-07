@@ -30,7 +30,7 @@ namespace Flippy
         IntPtr plat = IntPtr.Zero; Native.RECT platR; bool havePlatR, walkOff;
         // looks
         int blink, nextBlink = 200, shake, tuftT;
-        IntPtr menuFg; int menuAway;          // to close the menus: the app that was in front when they opened, how long the cursor has been away
+        IntPtr menuFg; int menuAway; bool menuInit;   // to close the menus: the app in front when they opened, how long the cursor has been away
         // input
         bool drag, moved; double grabDX, grabDY, dvx, dvy; Point downPt, lastCur; readonly List<int> clicks = new List<int>();
         Point cur; double cdx, cdy, cdist; int lookEye; bool lookUp, overBody, curMoved;
@@ -151,7 +151,7 @@ namespace Flippy
             Point p = Cursor.Position;
             if (!moved && Math.Abs(p.X - downPt.X) + Math.Abs(p.Y - downPt.Y) > 4)
             {
-                moved = true; cloud.Close(Tick); fx.WebOff();
+                moved = true; CloseMenus(); fx.WebOff();
                 if (suit) { suit = false; Poof(); }
                 LeavePlatform(); rot = 0;
                 Say(Pick(new[] { "wheee!", "whoa!", "put me down!", "where are we going?" }), 70);
@@ -203,12 +203,12 @@ namespace Flippy
             if (cfg.Smash) items.Add(new MenuItem("Smash the laptop", () => { parts.Clear(); Set("smash"); }));
             items.Add(MenuItem.Separator());
             items.Add(new MenuItem("Do your thing!", DoSignature));
-            items.Add(new MenuItem("Change pet...", () => { picker.Show(new PointF((float)X, (float)CY(Sprite.OY - 2)), W.Work, S); menuFg = IntPtr.Zero; menuAway = 0; }));
+            items.Add(new MenuItem("Change pet...", () => { picker.Show(new PointF((float)X, (float)CY(Sprite.OY - 2)), W.Work, S); menuInit = false; }));
             items.Add(new MenuItem("Settings...", () => { if (OpenSettings != null) OpenSettings(); }));
             items.Add(new MenuItem("Bye, " + SpeciesList.Current.ShortName, () => { if (Quit != null) Quit(); }));
             double[] nd = cfg.Needs ? new[] { needs.Fullness, needs.Energy, needs.Fun, needs.Love } : null;
             cloud.Show(items, nd, new PointF((float)X, (float)CY(Sprite.OY - 2)), W.Work, S);
-            menuFg = IntPtr.Zero; menuAway = 0;
+            menuInit = false; if (Program.Verbose) Program.Log("menu opened");
         }
 
         public void SpawnFood(bool atCursor)
@@ -237,6 +237,7 @@ namespace Flippy
             if (m == "smash") parts.Clear();
             Set(m, m == "dance" ? 340 : 0);
         }
+        void CloseMenus() { cloud.Close(Tick); picker.Close(Tick); ClickWatch.Stop(); menuInit = false; }
         public void Poked() { cloud.Close(Tick); if (!drag) { Set("wave"); poked = true; } }
         bool poked;
 
@@ -244,6 +245,7 @@ namespace Flippy
         public void Step()
         {
             Tick++; T++;
+            if (menuInit && !cloud.Open && !picker.Open) { ClickWatch.Stop(); menuInit = false; }   // closed by picking an item
             if (Tick == 1 && TestX >= 0) X = TestX;
             if (Tick == 90 && ForceMode != null) { if (ForceMode == "food") SpawnFood(false); else if (ForceMode == "menu") OpenMenu(); else if (ForceMode == "picker") picker.Show(new PointF((float)X, (float)CY(Sprite.OY - 2)), W.Work, S); else if (ForceMode == "switch") SwitchTo(SpeciesList.All[SpeciesList.All.IndexOf(SpeciesList.Current) == 0 ? 1 : 0]); else if (ForceMode == "signature") DoSignature(); else Set(ForceMode, 600); }
             if (ForceMode == "watch" || ForceMode == "paused") { videoSeen = Tick; videoRect = W.Work; }
@@ -286,13 +288,13 @@ namespace Flippy
                 Rectangle body = new Rectangle(R.Body.SX, R.Body.SY, R.Body.Surf.W, R.Body.Surf.H);
                 Rectangle menu = cloud.Open ? cloud.Bounds : picker.Bounds;
                 bool over = body.Contains(cur) || menu.Contains(cur);
+                if (!menuInit) { menuInit = true; menuFg = Native.Foreground(); menuAway = 0; ClickWatch.Start(); }   // just opened
                 menuAway = over ? 0 : menuAway + 1;
-                if (T < 2 || menuFg == IntPtr.Zero) { menuFg = Native.Foreground(); Native.MouseClicked(); }      // just opened: reset
-                bool close = (Native.MouseClicked() && !over)          // clicked somewhere else (even a quick click between ticks)
-                             || Native.EscDown()                        // Esc
-                             || Native.Foreground() != menuFg           // Alt+Tab / another window came to the front
-                             || menuAway > 240;                         // cursor wandered off for 4 seconds
-                if (close) { cloud.Close(Tick); picker.Close(Tick); menuFg = IntPtr.Zero; }
+                string why = ClickWatch.ClickedOutside(R.Body.Handle, cloud.Handle, picker.Handle) ? "click"   // clicked anywhere else
+                           : Native.EscDown() ? "esc"
+                           : Native.Foreground() != menuFg ? "focus"                          // Alt+Tab / another window came to the front
+                           : menuAway > 240 ? "away" : null;                                    // cursor wandered off for 4 seconds
+                if (why != null) { if (Program.Verbose) Program.Log("menu closed: " + why + (why == "focus" ? " [" + Native.Title(menuFg) + "] -> [" + Native.Title(Native.Foreground()) + "]" : "")); CloseMenus(); }
                 picker.Tick();
             }
             else

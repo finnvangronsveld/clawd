@@ -34,6 +34,7 @@ namespace Flippy
             win.Cursor = Cursors.Hand;
         }
         public Rectangle Bounds { get { return new Rectangle(win.SX, win.SY, win.Surf.W, win.Surf.H); } }
+        public IntPtr Handle { get { return win.Handle; } }
 
         public void Show(PointF headPt, Native.RECT wk, int s)
         {
@@ -43,7 +44,7 @@ namespace Flippy
             for (int i = 0; i < blinkAt.Length; i++) blinkAt[i] = 40 + rng.Next(120);
             Draw();
         }
-        public void Close(int tick) { if (Open) { if (Program.Verbose) Program.Log("picker closed at tick " + tick + "\n" + Environment.StackTrace); Open = false; ClosedAt = tick; win.Hide(); } }
+        public void Close(int tick) { if (Open) { if (Program.Verbose) Program.Log("picker closed"); Open = false; ClosedAt = tick; win.Hide(); } }
         // called every tick while open: keeps the previews alive
         public void Tick()
         {

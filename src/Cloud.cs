@@ -38,6 +38,7 @@ namespace Flippy
             win.Cursor = Cursors.Hand;
         }
         public Rectangle Bounds { get { return new Rectangle(win.SX, win.SY, win.Surf.W, win.Surf.H); } }
+        public IntPtr Handle { get { return win.Handle; } }
 
         public void Show(List<MenuItem> it, double[] nd, PointF headPt, Native.RECT wk, int s)
         {
