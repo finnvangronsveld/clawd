@@ -56,7 +56,7 @@ namespace Flippy
         public double Size = 1.0;        // 0.5 .. 2
         public double Activity = 1.0;    // 0.3 (calm) .. 2 (hyper)
         public double Chatty = 1.0;      // 0 (quiet) .. 2
-        public string Pet = "flippy";    // which pet (species id); unknown ids fall back to the default
+        public string Pet = "phone";     // which pet (species id); unknown ids (e.g. the retired "flippy" blob) fall back to the default
         public event Action Changed;
 
         static readonly string[] keys = { "Gun", "Tricks", "WebSwing", "Smash", "MovieNight", "PauseTantrum", "Commentary", "TypeAlong", "Climbing", "Needs", "PcReactions", "Music" };

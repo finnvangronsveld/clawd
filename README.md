@@ -2,9 +2,9 @@
 
 A little pixel buddy who lives on your Windows desktop.
 
-<p align="center"><img src="docs/flippy.gif" alt="Flippy walking in, waving, typing along, thinking, eating a cookie, dancing, doing a front flip, aiming his pellet gun, pulling a 360 no-scope, climbing a window, watching a video with popcorn, getting mad when it's paused, smashing his laptop, and napping"></p>
+<p align="center"><img src="docs/flippy.gif" alt="Flip the flip phone walking in, waving, typing along, thinking, eating a cookie, dancing, doing a front flip, aiming his pellet gun, pulling a 360 no-scope, climbing a window, watching a video with popcorn, getting mad when it's paused, smashing his laptop, and napping"></p>
 
-Flippy is a round teal blob with an arrow-shaped tuft that always points the way he's going. He walks along your taskbar and climbs onto your windows. When you type, he types along on his tiny laptop. When you watch a video, he grabs popcorn and watches with you. He gets hungry, tired and bored, so feed him, pet him and play with him.
+Flippy comes with a little gang of pets: Flip the flip phone (the default), Hopper the frog, Flapjack the pancake and Clawd (classic). Your pet walks along your taskbar and climbs onto your windows. When you type, he types along on his tiny laptop. When you watch a video, he grabs popcorn and watches with you. He gets hungry, tired and bored, so feed him, pet him and play with him.
 
 ## Install
 
@@ -23,10 +23,14 @@ You don't need admin rights or anything else installed: Flippy is a single small
 
 Right-click your pet and choose **Change pet...**. A thought cloud opens with a live preview of every pet. Click one, and your current pet does a front flip, there's a poof, and the new one lands in the same spot. You can also choose in **Settings**.
 
-- **Flippy** (the default): always moving forward. His thing is a forward front flip.
+- **Flip** (the default): a flip phone with feelings. His face lives on the LCD screen.
+- **Hopper**: a frog who flips.
+- **Flapjack**: a pancake stack with butter and syrup.
 - **Clawd (classic)**: the original orange buddy. His thing is smashing his laptop.
 
-Every pet can do everything below. Your choice, settings and his hunger levels are remembered.
+Flip, Hopper and Flapjack all do a front flip as their signature move: Flippy is named after Flipforward.
+
+Every pet can do everything below. The menu closes when you click elsewhere, press Esc, switch windows, or move away. Your choice, settings and his hunger levels are remembered.
 
 ## Playing with him
 

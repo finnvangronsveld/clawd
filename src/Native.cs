@@ -107,6 +107,9 @@ namespace Flippy
             if (!GetLastInputInfo(ref l)) return 0;
             return unchecked((uint)Environment.TickCount - l.dwTime);
         }
+        // any mouse button down now, or pressed since the last call (catches quick clicks between ticks)
+        public static bool MouseClicked() { return ((GetAsyncKeyState(1) | GetAsyncKeyState(2) | GetAsyncKeyState(4)) & 0x8001) != 0; }
+        public static bool TopVisibleAt(IntPtr h, int x, int top) { return TopVisible(h, x, top); }
         public static bool EscDown() { return (GetAsyncKeyState(0x1B) & 0x8000) != 0; }
         public static bool LeftButtonDown() { return (GetAsyncKeyState(1) & 0x8000) != 0; }
         public static bool AnyMouseButtonDown() { return ((GetAsyncKeyState(1) | GetAsyncKeyState(2) | GetAsyncKeyState(4)) & 0x8000) != 0; }
