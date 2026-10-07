@@ -11,7 +11,7 @@ Public repo: https://github.com/finnvangronsveld/flippy
 
 Local checkouts (the owner has more than one PC):
 
-- `C:\Users\Finn Vangronsveld\PROJECTS\flippy`: the running copy is `Flippy.exe` in that folder, and the Start menu and Startup shortcuts point there. An older install also exists in `%LOCALAPPDATA%\Programs\Flippy` (with a Settings › Apps entry), but it isn't used.
+- `C:\Users\Finn Vangronsveld\PROJECTS\flippy`: the running copy is `Flippy.exe` in that folder, and the Start menu and Startup shortcuts point there. The old installer copy (`%LOCALAPPDATA%\Programs\Flippy` and its Settings › Apps entry) was removed here.
 - `C:\Users\finnv\PROJECTS\Flippy` (renamed from `PROJECTS\Clawd`) on the other PC, where the shortcuts point to `PROJECTS\Flippy\Flippy.exe`.
 
 Starting `Flippy.exe` (without `--test`) points the shortcuts at whichever exe was started. Check which PC you're on with `$env:USERPROFILE`.
