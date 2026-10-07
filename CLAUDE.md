@@ -9,7 +9,12 @@ Public repo: https://github.com/finnvangronsveld/flippy
 
 **Keep this file and `README.md` up to date whenever behaviour changes.** The owner asked for this explicitly: he updates the Flippy website from this file, so the "For the website" section below must always match the latest release.
 
-Local checkout: `C:\Users\finnv\PROJECTS\Flippy` (renamed from `PROJECTS\Clawd`). The owner's running copy is `PROJECTS\Flippy\Flippy.exe`, and his Start menu and Startup shortcuts point there.
+Local checkouts (the owner has more than one PC):
+
+- `C:\Users\Finn Vangronsveld\PROJECTS\flippy`: the running copy is `Flippy.exe` in that folder, and the Start menu and Startup shortcuts point there. An older install also exists in `%LOCALAPPDATA%\Programs\Flippy` (with a Settings › Apps entry), but it isn't used.
+- `C:\Users\finnv\PROJECTS\Flippy` (renamed from `PROJECTS\Clawd`) on the other PC, where the shortcuts point to `PROJECTS\Flippy\Flippy.exe`.
+
+Starting `Flippy.exe` (without `--test`) points the shortcuts at whichever exe was started. Check which PC you're on with `$env:USERPROFILE`.
 
 ## For the website (current facts)
 
@@ -169,7 +174,7 @@ Old git history keeps the old name, and that's fine.
 4. Commit, ending the message with the Co-Authored-By line, and push.
 5. Build `dist/Flippy.zip`. It holds `Flippy.exe`, `flippy.ico`, `README.md`, both `.cmd` files and `tools/install.ps1` + `tools/uninstall.ps1`.
 6. Run `"C:\Program Files\GitHub CLI\gh.exe" release create vX.Y dist/Flippy.zip ...`. The README links `releases/latest/download/Flippy.zip`.
-7. Restart the owner's pet: `Get-Process Flippy | Stop-Process`, then start `PROJECTS\Flippy\Flippy.exe`.
+7. Restart the owner's pet: `Get-Process Flippy | Stop-Process`, then start `Flippy.exe` in this PC's checkout (see "Local checkouts" above).
 
 ## Product rules
 
