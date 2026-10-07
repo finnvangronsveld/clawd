@@ -38,7 +38,7 @@ namespace Flippy
 
             // walk in, wave
             Run(170, t => { X += 0.85 * K * 1.2; L.Eye = 1; L.Phase = (tick / 10) % 4; });
-            Say("hi!", 90);
+            Say(SpeciesList.Current.Hello, 100);
             Run(100, t => { L.EyeStyle = "happy"; L.Mouth = "smile"; L.Arms = (t / 12) % 2 == 0 ? "wave1" : "wave2"; });
             // types along, thinks when you pause
             bool hand = false;
@@ -69,6 +69,18 @@ namespace Flippy
                 L.EyeStyle = "happy"; L.Mouth = "smile"; int beat = t / 16; L.Sit = beat % 2 == 1; L.Arms = beat % 2 == 0 ? "upL" : "upR";
                 if (t % 28 == 1) Float("note", Sprite.OX + 9 + rng.Next(-10, 11), Sprite.OY - 4, 0, -0.15, 80, Pal.Notes[rng.Next(4)]);
             });
+            // his signature front flip
+            Say(SpeciesList.Current.SignatureLine, 60);
+            double fjy = 0, fjv = 0; int tuft = 0;
+            Run(110, t =>
+            {
+                if (t < 18) { L.Sit = true; L.EyeStyle = "happy"; }
+                if (t == 18) fjv = 5.6 * K;
+                if (t >= 18 && (fjy > 0 || t == 18)) { fjy += fjv; fjv -= 0.21 * K; X += 1.5 * K; rot = Math.Min(360, (t - 18) * 360.0 / 52); L.Arms = "up"; L.EyeStyle = "happy"; if (fjy <= 0) { fjy = 0; rot = 0; squashT = 14; tuft = 18; } }
+                if (tuft > 0) { tuft--; L.TuftLift = tuft > 10 ? 2 : (tuft > 4 ? 1 : 0); L.EyeStyle = "happy"; L.Mouth = "smile"; }
+                Y = Ground - fjy;
+            });
+            rot = 0; Y = Ground;
             // gun: aims all over, then a 360 no-scope
             Say("hold still...", 70);
             Run(110, t => { L.Gun = true; L.Arms = "aim"; L.AimSide = 1; L.Eye = 1; L.EyeStyle = "angry"; L.AimDeg = -100 + t * 1.15; L.Flash = t % 30 < 5 && t > 20; L.Recoil = L.Flash; });

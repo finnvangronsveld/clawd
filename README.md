@@ -1,23 +1,32 @@
-# Clawd
+# Flippy
 
-A little orange pixel buddy who lives on your Windows desktop.
+A little pixel buddy who lives on your Windows desktop.
 
-<p align="center"><img src="docs/clawd.gif" alt="Clawd walking in, waving, typing along, thinking, eating a cookie, dancing, aiming his pellet gun, pulling a 360 no-scope, climbing a window, watching a video with popcorn, getting mad when it's paused, smashing his laptop, and napping"></p>
+<p align="center"><img src="docs/flippy.gif" alt="Flippy walking in, waving, typing along, thinking, eating a cookie, dancing, doing a front flip, aiming his pellet gun, pulling a 360 no-scope, climbing a window, watching a video with popcorn, getting mad when it's paused, smashing his laptop, and napping"></p>
 
-He walks along your taskbar and climbs onto your windows. When you type, he types along on his tiny laptop. When you watch a video, he grabs popcorn and watches with you. He gets hungry, tired and bored, so feed him, pet him and play with him. Once in a while he smashes his laptop in frustration.
+Flippy is a round teal blob with an arrow-shaped tuft that always points the way he's going. He walks along your taskbar and climbs onto your windows. When you type, he types along on his tiny laptop. When you watch a video, he grabs popcorn and watches with you. He gets hungry, tired and bored, so feed him, pet him and play with him.
 
 ## Install
 
-1. **[Download Clawd](https://github.com/finnvangronsveld/clawd/releases/latest/download/Clawd.zip)** and unzip it anywhere.
-2. Double-click **`Install Clawd.cmd`**.
+1. **[Download Flippy](https://github.com/finnvangronsveld/flippy/releases/latest/download/Flippy.zip)** and unzip it anywhere.
+2. Double-click **`Install Flippy.cmd`**.
 
-You don't need admin rights or anything else installed: Clawd is a single small `Clawd.exe` (about 130 KB). He appears at the bottom of your screen and starts with Windows; you can turn that off in his settings.
+You don't need admin rights or anything else installed: Flippy is a single small `Flippy.exe`. He appears at the bottom of your screen and starts with Windows; you can turn that off in his settings.
 
-- **Bring him back:** if you send him away, start **Clawd** from the Start menu.
-- **Uninstall:** use **Settings › Apps**, or double-click `Uninstall Clawd.cmd`.
-- **No install:** you can also just double-click `Clawd.exe`. He adds himself to the Start menu.
+- **Bring him back:** if you send him away, start **Flippy** from the Start menu.
+- **Uninstall:** use **Settings › Apps**, or double-click `Uninstall Flippy.cmd`.
+- **No install:** you can also just double-click `Flippy.exe`. He adds himself to the Start menu.
 
-> Clawd isn't code-signed, so Windows SmartScreen may say "Windows protected your PC". Click **More info → Run anyway**. The full source is in this repo.
+> Flippy isn't code-signed, so Windows SmartScreen may say "Windows protected your PC". Click **More info → Run anyway**. The full source is in this repo.
+
+## Pick your pet
+
+Right-click your pet and choose **Change pet...**. A thought cloud opens with a live preview of every pet. Click one, and your current pet does a front flip, there's a poof, and the new one lands in the same spot. You can also choose in **Settings**.
+
+- **Flippy** (the default): always moving forward. His thing is a forward front flip.
+- **Clawd (classic)**: the original orange buddy. His thing is smashing his laptop.
+
+Every pet can do everything below. Your choice, settings and his hunger levels are remembered.
 
 ## Playing with him
 
@@ -30,6 +39,7 @@ You don't need admin rights or anything else installed: Clawd is a single small 
 | Rub the cursor over him | Blushes and floats hearts |
 | Bring the cursor near | Waves hi |
 | Right-click | Opens his thought-cloud menu, with his mood bars on top |
+| **Do your thing!** (menu) | His signature move |
 | **Give him a snack** (menu) | A cookie, pizza, apple or donut drops in. Drag it to him, or he walks over and eats it in three bites. |
 | **Drop a file on him** | Chews on it and has opinions ("a pdf... very official", "I'm NOT running that"). Your file isn't touched. |
 | Type | He pulls out his laptop and types along, one hand per key |
@@ -63,6 +73,7 @@ He has four needs: **food, energy, fun and love**. You can see them in his menu.
 - dances
 - takes coffee breaks
 - thinks hard
+- does his signature move
 - spots any window he can reach, runs over, jumps onto it and rides along when you move it
 - shoots tiny pellets at your cursor, aiming in every direction
 - pulls off trickshots: 360 no-scopes, no-look shots and ricochets
@@ -75,6 +86,7 @@ He never steals focus from what you're doing, and he doesn't show up in the task
 
 Right-click him and choose **Settings...**. From there you can:
 
+- pick your pet
 - turn individual things on or off: the gun, trickshots, the web-slinger, laptop smashing, movie night, the pause tantrum, commentary, typing along, climbing, needs, PC reactions and music
 - set his **size**, how **active** he is and how **chatty** he is
 - turn starting with Windows on or off
@@ -88,7 +100,7 @@ Everything stays on your PC:
 - **Videos:** he checks the title of the window in front to notice a video. He reads playing/paused from Windows' own media controls (the volume-key overlay).
 - **PC reactions:** battery level, CPU load and "something was copied" events. He never reads what you copied.
 - **Dropped files:** he only looks at the file name.
-- **Saved data:** settings and needs are kept in `%APPDATA%\Clawd`.
+- **Saved data:** your settings, chosen pet and his needs are stored only in `%APPDATA%\Flippy`.
 
 Nothing is sent anywhere.
 
@@ -100,11 +112,11 @@ You only need Windows. The build uses the C# compiler that comes with every Wind
 powershell -ExecutionPolicy Bypass -File build.ps1
 ```
 
-This produces `Clawd.exe`. To re-render the GIF above, run Clawd's scripted demo off-screen, then build the GIF with Python and Pillow:
+This produces `Flippy.exe`. To re-render the GIF above, run the scripted demo off-screen, then build the GIF with Python and Pillow:
 
 ```powershell
-.\Clawd.exe --render-frames .\frames
-python tools\make_gif.py .\frames docs\clawd.gif
+.\Flippy.exe --render-frames .\frames
+python tools\make_gif.py .\frames docs\flippy.gif
 ```
 
-Clawd v1 (a single PowerShell script) lives on in `legacy/clawd-v1.ps1`.
+Flippy started life as Clawd, a little orange pet. He's still in the pet picker as "Clawd (classic)", and v1 (a single PowerShell script) lives on in `legacy/v1.ps1`.

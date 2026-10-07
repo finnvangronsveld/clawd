@@ -1,6 +1,11 @@
-# Clawd: notes for Claude
+# Flippy: notes for Claude
 
-Clawd is a pixel-art desktop pet for Windows: a little orange guy who lives on the desktop. **V2** is a C# Windows Forms app (`src/*.cs` → `Clawd.exe`), built with the .NET Framework 4.x compiler that ships with every Windows install. Public repo: https://github.com/finnvangronsveld/clawd
+Flippy is a pixel-art desktop pet for Windows. The app is a C# Windows Forms program (`src/*.cs` → `Flippy.exe`), built with the .NET Framework 4.x compiler that ships with every Windows install. Pets are **species** (data plus drawing code), so every behaviour works for every pet:
+
+- **Flippy**, a teal arrow blob, is the default.
+- "Clawd (classic)" is the second pet.
+
+Public repo: https://github.com/finnvangronsveld/flippy
 
 **Keep this file and `README.md` up to date whenever behaviour changes.** The owner asked for this explicitly.
 
@@ -8,94 +13,95 @@ Clawd is a pixel-art desktop pet for Windows: a little orange guy who lives on t
 
 | Path | What |
 |---|---|
-| `src/Program.cs` | Entry point: single instance (mutex + poke event), the fixed 60 Hz loop, shortcuts, the settings window, test switches, `--render-frames`. |
-| `src/Native.cs` | All P/Invoke: layered windows, window queries (`Usable`, `FindTop`, `FindClimbTarget`), input (idle time, key-press **counts**), DPI, monitors, auto-hide taskbar, CPU load. |
-| `src/Layered.cs` | `Surface` (a DIB section GDI+ draws into) and `LayeredWindow`: per-pixel alpha via `UpdateLayeredWindow`, topmost, no-activate, tool window. |
-| `src/Art.cs` | Palette (`Pal`), the cell canvas (`Cells`), glyphs, `Look` (everything about this frame's pose), and `Sprite.DrawFront` / `DrawBack` (all the pixel art). |
-| `src/Render.cs` | `Renderer`: cells → screen. Draws two windows: **Body** (Clawd plus the gun; this is the only window that takes clicks) and **Fx** (click-through: shadow, movie-night glow, particles, speech bubble). Handles squash/stretch and rotation. |
-| `src/Pet.cs` | The body and senses: position (feet), physics, platforms, mouse (drag, throw, clicks), sensors, particles, the per-tick `Step()` and `Draw()`, and frame skipping. |
-| `src/Behaviours.cs` | `Triggers()` (what grabs his attention), `PickActivity()` (weighted by settings and needs), and `Behave()` (the big mode switch), plus gun, trickshots, web-swing, movie night, file comments and the smash. |
-| `src/Effects.cs` | Pellets and the web line: small click-through overlay windows sized to their content. |
-| `src/Cloud.cs` | The thought-cloud right-click menu (anti-aliased) with mood bars. |
-| `src/Food.cs` | Snack sprites and `FoodItem`: a draggable window with gravity. |
-| `src/Settings.cs` | `Settings` (feature toggles + size/activity/chattiness sliders + the settings form), `Needs` (food/energy/fun/love), and `Store` (key=value files in `%APPDATA%\Clawd`). |
-| `src/Media.cs` | Play/pause via WinRT GSMTC, called through reflection (no winmd references needed). |
-| `src/World.cs` | Monitor, DPI → scale `S` and `K`, floor, `GroundAt`. |
+| `src/Program.cs` | Entry point: single instance (`Local\FlippyDesktopPet` + `Local\FlippyPoke`), migration calls, the fixed 60 Hz loop, shortcuts (`Flippy.lnk`), the settings window, and the dev and test switches. |
+| `src/Species.cs` | `Species` (id, name, short name, tagline, palette, prop anchors, lines, signature mode, `DrawBody` / `DrawFace` / `DrawBack`) and `SpeciesList` (`All`, `Get` with fallback to the default, `Current`). |
+| `src/SpeciesFlippy.cs` | Flippy: the body is built as a mask, and the outline plus light/shade are derived from it. He has a forward-arrow tuft that mirrors with `Look.Face`. |
+| `src/SpeciesClassic.cs` | The classic orange pet. Deleting this file and its entry in `SpeciesList.All` removes him. |
+| `src/Art.cs` | `Pal`, `Cells` (the pixel canvas), `Glyphs`, `Look` (this frame's pose), and `Sprite`. `Sprite` holds the shared props (headphones, nightcap, mug, snacks, laptop, the "!"), the species-agnostic web-slinger suit, the popcorn bucket, the gun bitmaps and `IconArt`. |
+| `src/Render.cs` | `Renderer`: cells → screen. **Body** window (the pet plus the gun; the only window that takes clicks) and **Fx** window (click-through: shadow, movie-night glow, particles, bubble). Squash/stretch and rotation. |
+| `src/Pet.cs` + `src/Behaviours.cs` | `partial class Pet`: body, senses, mouse, menu (`OpenMenu`), `SwitchTo`, `Triggers`, `PickActivity`, and the mode switch (`Behave`). |
+| `src/Picker.cs` | The "Change pet..." thought cloud: live previews, hover in the species' accent colour, a check on the current pet. |
+| `src/Cloud.cs` | The right-click thought-cloud menu, with mood bars. |
+| `src/Settings.cs` | `Store` (key=value files in `%APPDATA%\Flippy`), `Settings` (toggles, sliders, `Pet=<id>`, and the settings form with its Pet section), and `Needs`. |
+| `src/Migration.cs` | The **only** code that knows the old name. It copies settings and needs from the old folder once, stops an old running instance, and replaces old shortcuts. |
+| `src/Food.cs`, `Effects.cs`, `Media.cs`, `Native.cs`, `Layered.cs`, `World.cs` | Snacks, pellets and the web line, play/pause (WinRT via reflection), P/Invoke, per-pixel-alpha windows, and monitors/DPI. |
 | `src/Demo.cs` | The scripted README show on a fake desktop, rendered off-screen. |
-| `build.ps1` | Compiles `Clawd.exe` (C# 5, `/target:winexe`, icon `clawd.ico`). |
-| `tools/install.ps1`, `tools/uninstall.ps1` (+ the two `.cmd` wrappers) | Per-user install to `%LOCALAPPDATA%\Programs\Clawd`: Start menu + Startup shortcuts and a Settings › Apps entry (version 2.0). Their params exist only for sandbox testing. |
-| `tools/make_gif.py` | Frames → `docs/clawd.gif` (one shared palette, no dithering). |
-| `legacy/clawd-v1.ps1` | The v1 PowerShell pet, for reference only. |
+| `src/DevTools.cs` | `--dump-sprites` (pixel-diffable poses) and `--make-icon`. |
+| `build.ps1` | Compiles `Flippy.exe` (C# 5, icon `flippy.ico`). `-Out bin\Dev.exe` builds elsewhere, so a running copy doesn't lock the output. |
+| `tools/install.ps1`, `tools/uninstall.ps1`, `Install Flippy.cmd`, `Uninstall Flippy.cmd` | Per-user install to `%LOCALAPPDATA%\Programs\Flippy`: Start menu + Startup `Flippy.lnk` and a Settings › Apps entry "Flippy". The installer also removes an old pre-rename install. The params exist only for sandbox testing. |
+| `tools/make_gif.py`, `tools/diff_sprites.py`, `tools/contact_sheet.py` | Demo GIF, sprite pixel-diff, labelled pose sheets. |
+| `legacy/v1.ps1` | The v1 PowerShell pet, for reference only. Don't edit it. |
 
-`Clawd.exe`, `dist/` and `frames/` are build output and gitignored. Settings, needs and logs live in `%APPDATA%\Clawd`.
+`Flippy.exe`, `bin/`, `dist/`, `frames/` and the logs are gitignored. Settings, needs and logs live in `%APPDATA%\Flippy`.
 
 ## Gotchas (read before editing)
 
-- **C# 5 only.** `csc.exe` v4.8 has no `$"..."`, `?.`, `nameof`, expression-bodied members, `out var`, tuples or local functions. Lambdas, `var`, LINQ and anonymous types are fine.
-- **Never call `Show()` in a way that activates.** `LayeredWindow` overrides `ShowWithoutActivation` and returns `MA_NOACTIVATE`, so he never steals focus. Overlays are click-through (`WS_EX_TRANSPARENT`).
-- **Hit-testing:** with `UpdateLayeredWindow`, pixels with alpha 0 are click-through. That's why the shadow, glow and bubble live in the separate click-through **Fx** window, not in **Body**.
-- **Screenshots:** a normal `CopyFromScreen`/`BitBlt` skips layered windows. Add the `CAPTUREBLT` flag (`0x40000000`).
+- **C# 5 only.** `csc.exe` v4.8 has no `$"..."`, `=>` members, `?.`, `nameof`, `out var`, tuples, local functions or auto-property initialisers. Lambdas, `var` and LINQ are fine. Keep sources ASCII; the `.cmd` files stay CRLF (`.gitattributes`).
+- **Focus:** `LayeredWindow` never activates (`ShowWithoutActivation`, `MA_NOACTIVATE`). Overlays are click-through. Pixels with alpha 0 are click-through, which is why soft effects live in the **Fx** window.
+- **Screenshots:** a plain `BitBlt`/`CopyFromScreen` skips layered windows. Use `CAPTUREBLT` (`0x40000000`).
 - **Coordinates:**
   - `X`, `Y` = his **feet** in screen pixels.
-  - Art is drawn in cells: his 22×16 box sits at `Sprite.OX`, `Sprite.OY` in a 60×34 canvas.
+  - The pet's 22×16 box sits at `Sprite.OX`, `Sprite.OY` in a 60×34 cell canvas. Flippy's tuft sticks out above it.
   - `S` = screen pixels per cell (from DPI and the size setting), and `K = S/3` scales speeds.
-  - `CX()`/`CY()` convert cells to screen.
-- **Timing:** the simulation runs at a fixed 60 ticks/s (behaviours count ticks). `Draw()` skips frames when nothing visible changed, and only moves the windows when just his position changed. If you add a visual, put it in `Look` and in `Look.Key()`.
-- `Look` is **reset every tick**; modes set it each frame. Persistent things (like `suit`) live in `Pet`.
-- The running `Clawd.exe` locks the file. Stop it before building (`Get-Process Clawd | Stop-Process`).
+- **Timing:** a fixed 60 ticks/s. `Draw()` skips frames when nothing changed. Any new visual must be in `Look` **and** `Look.Key()`.
+- `Look` is reset every tick, and modes set it each frame. Persistent state (`suit`, `Dir`) lives in `Pet`.
+- **Art:** draw only into `Cells` (`Rect`/`Dot`/`Glyph`), never anti-aliased. Chunky pixels, a dark outline, a light top-left edge and a shaded bottom-right.
+- **Species:** behaviours never draw pet-specific pixels. Props are placed with the species' anchors (`MugSipX`, `HeldY`, `BangY`, `MaskLX`...).
 
-## Modes
+## Adding a pet
 
-- **Free** (can be interrupted by triggers): `walk`, `idle`, `chase`.
-- **Everything else:**
-  - `fall` (hops, jumps and **throws**: bounces, spin, dizzy on a hard landing)
-  - `crouch`, `goclimb`
-  - `wave`, `pet`, `dizzy`, `dance`, `bop` (music), `coffee`, `think`, `typing`
-  - `yawn`, `sleep` (nap when tired: `napping`)
-  - `morning`, `hungry`, `gofood`, `eat`, `sniff`, `filechew`, `catch` (clipboard), `hot` (CPU), `lowbatt`, `charged`
-  - `smash`, `gun`, `trick`
-  - `gowatch`, `watch`, `paused`
-  - `suitup`, `swing`, `heropose`
-
-**Adding a behaviour:**
-1. Add a `case` in `Behave`.
-2. Add a trigger in `Triggers` and/or a weight in `PickActivity` (respect `cfg` toggles and needs).
-3. Add a menu item in `Pet.OpenMenu`.
-4. If it can be switched off, add a settings toggle (`Settings.Labels` plus the field).
-5. Optionally add a demo segment.
-6. Update the README and this file.
+1. Add `src/Species<Name>.cs` with a class deriving `Species`. Set `Id`, `Name`, `ShortName`, `Tagline`, `Hello`, `Lines`, `SignatureMode` / `SignatureLine`, the palette (`Body`, `Light`, `Shade`, `Outline`, `Back`, `Accent`, `Specular`) and any anchors that differ from the defaults.
+2. Implement `DrawBody` (every `Arms` value: out, typeL, typeR, down, up, upL, upR, wave1, wave2, sip, hold, fan, aim, plus the back-view ones rest, reach and eat), `DrawFace` (every `EyeStyle`: normal, up, down, wide, blink, sleep, happy, dizzy, heart, angry, sad; and every `Mouth`: none, o, smile, frown, yawn, chomp, chew; plus `Blush`) and `DrawBack`.
+3. Add it to `SpeciesList.All`. The first entry is the default.
+4. If the signature is a new mode, add a `case` in `Behave`. Otherwise point `SignatureMode` at an existing mode.
+5. Check his art: `bin\Dev.exe --dump-sprites <dir> --species <id>`, then `python tools/contact_sheet.py <dir> sheet.png 4`.
+6. Run a live test: `--test --pet <id> --mode <mode>` for walk, sleep, watch, gun, suitup, coffee, typing, dance, food, goclimb, signature and picker.
+7. Update the README's "Pick your pet" section and this file.
 
 ## Testing (run it and look)
 
-- **Build:** `powershell -ExecutionPolicy Bypass -File build.ps1`. Warnings are fine.
-- **Test switches:** `Clawd.exe --test --verbose --mode <mode> --x <screenX>`.
-  - `--test` uses its own mutex and poke event, so it runs next to the real one, and logs to `%APPDATA%\Clawd\clawd-test.log`.
-  - `--mode` forces a mode after 1.5 s. The special values are `food`, `menu`, `watch` and `paused`, which fake a video.
-  - `--verbose` logs every mode change with his position.
-- **Screenshots:** grab the screen with `BitBlt` + `CAPTUREBLT`, using a DPI-aware Windows PowerShell 5.1 helper. The owner's screen is 3200×2000 at 200 %.
-- **Demo:** `Clawd.exe --render-frames <dir>` (about 1400 frames, 800×270), then build contact sheets to check them.
-- **CPU:** measure `TotalProcessorTime` over 10 s. V2 uses about 3–4 % of one core while walking or idle (v1 used about 22 %).
-- **Installer:** run `tools/install.ps1` / `tools/uninstall.ps1` with `-Dest -MenuDir -StartupDir -RegName -DataDir -Quiet` into a temp folder. Never test into the real Start menu.
+- **Build:** `powershell -ExecutionPolicy Bypass -File build.ps1 -Out bin\Dev.exe`.
+- **Test switches:** `bin\Dev.exe --test --verbose [--pet <id>] [--mode <mode>] [--x <screenX>] [--data <dir>] [--old-data <dir>]`.
+  - `--test` uses its own mutex and poke event, and a **temp data folder** (`%TEMP%\FlippyTestData`, or `--data`). It never touches the real `%APPDATA%\Flippy`, and it skips the real migration and shortcut handling.
+  - `--mode` takes any mode name, or `food`, `menu`, `picker`, `switch`, `signature`, `watch` or `paused`.
+  - `--old-data` tests the settings migration from a fake old folder.
+  - Logs go to `<data>\flippy-test.log`.
+- **Art refactors:** `--dump-sprites` before and after, then `python tools/diff_sprites.py <before> <after> <diff_out>`.
+- **Demo:** `--render-frames <dir>` (about 1400 frames, 800×270), then contact sheets.
+- **CPU:** measure `TotalProcessorTime` over 10 s. Expect about 3–4 % of one core.
+- **Installer:** use `-Dest -MenuDir -StartupDir -RegName -OldDest -OldRegName -Quiet` (uninstall: `-DataDir`) into a temp folder, never into the real Start menu or registry. Test both a fresh install and an upgrade over a fake old install.
+
+## Rename and migration notes
+
+The app used to have a different name, and the classic pet still has it. The old name may appear only in:
+
+- the classic species file
+- `src/Migration.cs`
+- the old-install cleanup lines in `tools/install.ps1`
+- `legacy/`
+- the README credit line
+
+Old git history keeps the old name, and that's fine.
 
 ## Release checklist
 
-1. `build.ps1`, then `Clawd.exe --render-frames <tmp>` and `python tools/make_gif.py <tmp> docs/clawd.gif`.
-2. Update `README.md` and this file. Bump `Program.Version`, the assembly version and `DisplayVersion` in `install.ps1`.
-3. Commit, ending the message with the Co-Authored-By line, and push.
-4. Build `dist/Clawd.zip`. It holds `Clawd.exe`, `README.md`, both `.cmd` files and `tools/install.ps1` + `tools/uninstall.ps1`.
-5. Run `"C:\Program Files\GitHub CLI\gh.exe" release create vX.Y dist/Clawd.zip ...`. The README links `releases/latest/download/Clawd.zip`.
-6. Restart the owner's Clawd: `Get-Process Clawd | Stop-Process`, then start `PROJECTS\Clawd\Clawd.exe`.
+1. Run `build.ps1` (→ `Flippy.exe`). If the default pet's art changed, also run `bin\Dev.exe --make-icon flippy.ico`.
+2. Run `bin\Dev.exe --render-frames <tmp>`, then `python tools/make_gif.py <tmp> docs/flippy.gif`.
+3. Update `README.md` and this file. Bump the version in `Program.Version`, `AssemblyVersion`/`AssemblyFileVersion` and `DisplayVersion` in `tools/install.ps1`.
+4. Commit, ending the message with the Co-Authored-By line, and push.
+5. Build `dist/Flippy.zip`. It holds `Flippy.exe`, `flippy.ico`, `README.md`, both `.cmd` files and `tools/install.ps1` + `tools/uninstall.ps1`.
+6. Run `"C:\Program Files\GitHub CLI\gh.exe" release create vX.Y dist/Flippy.zip ...`. The README links `releases/latest/download/Flippy.zip`.
+7. Restart the owner's pet: `Get-Process Flippy | Stop-Process`, then start `PROJECTS\Flippy\Flippy.exe`.
 
 ## Product rules
 
 - **Privacy:**
   - Keyboard: count key presses only, never which keys.
-  - Read window titles, media state, battery, CPU and clipboard *events* locally only. Never read clipboard contents or file contents.
+  - Read window titles, media state, battery, CPU and clipboard *events* locally only. Never read clipboard or file contents.
+  - Store settings, the chosen pet and needs only in `%APPDATA%\Flippy`.
   - Nothing is sent anywhere.
-  - Keep the README privacy section accurate.
-- **Public-facing text** (README, menu, releases): don't use trademarked character names. The spider costume is the "web-slinger suit".
+- **Public-facing text:** don't use trademarked character names. The spider costume is the "web-slinger suit".
 - **Look:**
-  - Chunky pixel art for Clawd himself, with smooth, soft effects around him (shadow, glow, particles, bubbles).
-  - Dark-brown outline (`Pal.Outline`), a light top-left edge and a shaded bottom-right.
-  - Clawd orange is `217,119,87`.
+  - Chunky crisp pixel art for the pets, with smooth soft effects around them.
+  - Flippy is teal `47,184,176` with a yellow `255,204,51` arrow tuft.
 - He must never steal focus or show up in the taskbar or Alt+Tab.
