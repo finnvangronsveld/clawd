@@ -86,7 +86,7 @@ namespace Clawd
     {
         public string Arms = "out", EyeStyle = "normal", Mouth = "none", Laptop = "none", Glow = "blue", Mug = "none", Held = "none";
         public double HeldLeft = 1; public bool HeldUp;
-        public int Eye, Phase;
+        public int Eye, Phase, Face = 1, TuftLift;      // Face: which way he points (1 right, -1 left)
         public double Wob, LapRow;
         public bool Blush, Sit, Squash, Bang, Suit, Back, Headphones, Nightcap, Blink, Spin;
         public bool Gun, Recoil, Flash; public double AimDeg; public int AimSide = 1;
@@ -95,13 +95,13 @@ namespace Clawd
         public string Key()
         {
             return Arms + EyeStyle + Mouth + Laptop + Glow + Mug + Held + HeldLeft + HeldUp + Eye + Phase + Wob + LapRow + Blush + Sit + Squash + Bang + Suit + Back
-                   + Headphones + Nightcap + Blink + Gun + Recoil + Flash + (int)AimDeg + AimSide + Rim;
+                   + Face + TuftLift + Headphones + Nightcap + Blink + Gun + Recoil + Flash + (int)AimDeg + AimSide + Rim;
         }
         public void Reset()
         {
             Arms = "out"; EyeStyle = "normal"; Mouth = "none"; Laptop = "none"; Mug = "none"; Held = "none";
             Phase = 0; Wob = 0; Blush = Sit = Squash = Bang = Back = Spin = false; Gun = Recoil = Flash = false;
-            Headphones = Nightcap = HeldUp = false; HeldLeft = 1;
+            Headphones = Nightcap = HeldUp = false; HeldLeft = 1; TuftLift = 0;
         }
     }
 

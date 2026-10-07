@@ -272,7 +272,7 @@ namespace Clawd
                 if (X > maxX) { X = maxX; Dir = -1; VX = -Math.Abs(VX) * (thrown ? 0.6 : 1); spinV = -spinV * 0.6; }
                 if (Mode != "fall" && Mode != "swing" && Mode != "trick" && Y > ground) Y = ground;
             }
-            L.Suit = suit;
+            L.Suit = suit; L.Face = Dir;
             if (flashT > 0) flashT--;
             if (recoilT > 0) recoilT--;
             if (L.Gun) { L.Flash = flashT > 0; L.Recoil = recoilT > 0; }

@@ -33,7 +33,7 @@ namespace Clawd
 
     static class SpeciesList
     {
-        public static readonly List<Species> All = new List<Species> { new ClawdSpecies() };
+        public static readonly List<Species> All = new List<Species> { new FlippySpecies(), new ClawdSpecies() };
         public static Species Current = All[0];
         public static Species Default { get { return All[0]; } }
         public static Species Get(string id)

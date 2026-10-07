@@ -12,8 +12,9 @@ namespace Clawd
 {
     static class DevTools
     {
-        public static int DumpSprites(string dir)
+        public static int DumpSprites(string dir, string species)
         {
+            if (species != null) SpeciesList.Current = SpeciesList.Get(species);
             Directory.CreateDirectory(dir);
             foreach (string f in Directory.GetFiles(dir)) File.Delete(f);
             var states = new List<KeyValuePair<string, Action<Look>>>();
@@ -53,6 +54,10 @@ namespace Clawd
             add("back_phones", L => { L.Back = true; L.Headphones = true; });
             add("back_rim_pink", L => { L.Back = true; L.Rim = Pal.C(255, 178, 220); });
             add("back_wob", L => { L.Back = true; L.Wob = 1; });
+            add("face_left", L => L.Face = -1);
+            add("face_left_walk", L => { L.Face = -1; L.Phase = 1; L.Eye = -1; });
+            add("back_face_left", L => { L.Back = true; L.Face = -1; });
+            add("tuft_lift", L => { L.TuftLift = 1; L.Squash = true; L.EyeStyle = "happy"; });
 
             Cells c = new Cells(Sprite.CW, Sprite.CH);
             StringBuilder meta = new StringBuilder();
