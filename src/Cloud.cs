@@ -141,7 +141,7 @@ namespace Clawd
                     else
                     {
                         bool hot = i == hover;
-                        if (hot) using (GraphicsPath p = Rounded(new RectangleF(r.X + 2 * k, r.Y + 1 * k, r.Width - 4 * k, r.Height - 2 * k), 6 * k)) using (SolidBrush hb = new SolidBrush(Color.FromArgb(Pal.Orange))) g.FillPath(hb, p);
+                        if (hot) using (GraphicsPath p = Rounded(new RectangleF(r.X + 2 * k, r.Y + 1 * k, r.Width - 4 * k, r.Height - 2 * k), 6 * k)) using (SolidBrush hb = new SolidBrush(Color.FromArgb(SpeciesList.Current.Accent))) g.FillPath(hb, p);
                         g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
                         using (SolidBrush tb = new SolidBrush(hot ? Color.White : Color.FromArgb(Pal.Ink))) g.DrawString(m.Text, ft, tb, r.X + padX, r.Y + 2.5f * k);
                     }

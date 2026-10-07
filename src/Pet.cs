@@ -198,7 +198,7 @@ namespace Clawd
             if (cfg.Smash) items.Add(new MenuItem("Smash the laptop", () => { parts.Clear(); Set("smash"); }));
             items.Add(MenuItem.Separator());
             items.Add(new MenuItem("Settings...", () => { if (OpenSettings != null) OpenSettings(); }));
-            items.Add(new MenuItem("Bye, Clawd", () => { if (Quit != null) Quit(); }));
+            items.Add(new MenuItem("Bye, " + SpeciesList.Current.ShortName, () => { if (Quit != null) Quit(); }));
             double[] nd = cfg.Needs ? new[] { needs.Fullness, needs.Energy, needs.Fun, needs.Love } : null;
             cloud.Show(items, nd, new PointF((float)X, (float)CY(Sprite.OY - 2)), W.Work, S);
         }

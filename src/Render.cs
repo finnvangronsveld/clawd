@@ -258,7 +258,7 @@ namespace Clawd
                 int[] seq = { 0, 1, 2, 3, 2, 1 };
                 string[] rows = Glyphs.Get("sp" + seq[(Frame / 6) % 6]);
                 float px = 1.6f * k, gy = r.Top + (r.Height - 5 * px) / 2;
-                using (SolidBrush ob = new SolidBrush(Color.FromArgb(Pal.Orange)))
+                using (SolidBrush ob = new SolidBrush(Color.FromArgb(SpeciesList.Current.Accent)))
                     for (int i = 0; i < 5; i++) for (int j = 0; j < 5; j++) if (rows[i][j] == 'X') f.FillRectangle(ob, textX + j * px, gy + i * px, px, px);
                 textX += 10 * k;
             }

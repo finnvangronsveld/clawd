@@ -7,3 +7,4 @@ launch.vbs
 clawd.log
 t_*.ps1
 t_*.log
+bin/

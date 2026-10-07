@@ -81,7 +81,7 @@ namespace Clawd
         public static string[] Get(string n) { string[] r; return map.TryGetValue(n, out r) ? r : map["dot"]; }
     }
 
-    // Everything about how Clawd looks this frame (reset every tick, then set by the current behaviour).
+    // Everything about how the pet looks this frame (reset every tick, then set by the current behaviour).
     class Look
     {
         public string Arms = "out", EyeStyle = "normal", Mouth = "none", Laptop = "none", Glow = "blue", Mug = "none", Held = "none";
@@ -107,108 +107,53 @@ namespace Clawd
 
     static class Sprite
     {
-        // Clawd's 22x16 box sits at (OX, OY) in the cell canvas; his feet are on row OY+16.
+        // the pet's 22x16 box sits at (OX, OY) in the cell canvas; his feet are on row OY+16.
         public const int CW = 60, CH = 34, OX = 19, OY = 16;
         public const double ARM = 6.0;
 
         // shoulder + hand of the aiming arm (cells)
         public static void Aim(Look L, double ox, double oy, out double shx, out double shy, out double hx, out double hy, out double c, out double s)
         {
+            Species sp = SpeciesList.Current;
             bool left = L.AimSide < 0;
-            shx = left ? ox + 3 : ox + 19; shy = oy + 7;
+            shx = left ? ox + sp.ShoulderLX : ox + sp.ShoulderRX; shy = oy + sp.ShoulderY;
             double a = L.AimDeg * Math.PI / 180; c = Math.Cos(a); s = Math.Sin(a);
             hx = shx + c * ARM; hy = shy + s * ARM;
         }
 
         public static void DrawFront(Cells g, Look L)
         {
+            Species sp = SpeciesList.Current;
             double ox = OX + L.Wob, oy = OY;
             bool low = L.Sit || L.Squash;
             if (low) oy += 2;
-            int e = L.Eye;
-            var parts = new List<double[]>();
-            Action<double, double, int, int> add = (x, y, w, h) => parts.Add(new double[] { x, y, w, h });
 
-            double bx = ox + 4; int bw = 14;
-            add(bx, oy, bw, 12);
-            switch (L.Arms)
-            {
-                case "out": add(ox, oy + 6, 4, 2); add(ox + 18, oy + 6, 4, 2); break;
-                case "typeL": add(ox, oy + 8, 4, 2); add(ox + 18, oy + 6, 4, 2); break;
-                case "typeR": add(ox, oy + 6, 4, 2); add(ox + 18, oy + 8, 4, 2); break;
-                case "down": add(ox, oy + 8, 4, 2); add(ox + 18, oy + 8, 4, 2); break;
-                case "up": add(ox + 2, oy - 3, 2, 10); add(ox + 18, oy - 3, 2, 10); break;
-                case "upL": add(ox + 2, oy - 3, 2, 10); add(ox + 18, oy + 6, 4, 2); break;
-                case "upR": add(ox, oy + 6, 4, 2); add(ox + 18, oy - 3, 2, 10); break;
-                case "wave1": add(ox, oy + 6, 4, 2); add(ox + 18, oy - 3, 2, 10); break;
-                case "wave2": add(ox, oy + 6, 4, 2); add(ox + 18, oy + 3, 2, 4); add(ox + 20, oy - 2, 2, 6); break;
-                case "sip": add(ox, oy + 6, 4, 2); add(ox + 18, oy + 8, 3, 2); break;
-                case "hold": add(ox + 1, oy + 6, 3, 2); add(ox + 18, oy + 6, 3, 2); add(ox + 4, oy + 8, 2, 2); add(ox + 16, oy + 8, 2, 2); break;
-                case "fan": add(ox, oy + 6, 4, 2); add(ox + 18, oy + 1 + (L.Phase % 2) * 2, 2, 7); break;
-                case "aim":
-                    {
-                        double shx, shy, hx, hy, c, s; Aim(L, ox, oy, out shx, out shy, out hx, out hy, out c, out s);
-                        if (L.AimSide < 0) add(ox + 18, oy + 6, 4, 2); else add(ox, oy + 6, 4, 2);
-                        for (double d = 0; d <= ARM; d += 0.5) add(shx + c * d - 1, shy + s * d - 1, 2, 2);
-                        break;
-                    }
-            }
-            int[] legH = new int[4]; int[] legX = { 4, 8, 12, 16 };
-            for (int i = 0; i < 4; i++)
-            {
-                bool lifted = (L.Phase == 1 && (legX[i] == 8 || legX[i] == 16)) || (L.Phase == 3 && (legX[i] == 4 || legX[i] == 12));
-                legH[i] = low ? 2 : (lifted ? 3 : 4);
-            }
-            foreach (double[] q in parts) g.Rect(q[0] - 1, q[1] - 1, (int)q[2] + 2, (int)q[3] + 2, Pal.Outline);
-            for (int i = 0; i < 4; i++) g.Rect(ox + legX[i], oy + 12 + legH[i], 2, 1, Pal.Outline);
-            g.Rect(ox + 3, oy + 12, 1, legH[0] + 1, Pal.Outline); g.Rect(ox + 18, oy + 12, 1, legH[3] + 1, Pal.Outline);
-            foreach (double[] q in parts) g.Rect(q[0], q[1], (int)q[2], (int)q[3], Pal.Orange);
-            for (int i = 0; i < 4; i++) { g.Rect(ox + legX[i], oy + 12, 2, legH[i], Pal.Orange); g.Rect(ox + legX[i] + 1, oy + 12, 1, legH[i], Pal.Shade); }
-            // shading: lit from the top-left
-            g.Rect(bx, oy, bw, 1, Pal.Light); g.Rect(bx, oy + 1, 1, 10, Pal.Light);
-            g.Rect(bx, oy + 11, bw, 1, Pal.Shade); g.Rect(bx + bw - 1, oy + 1, 1, 11, Pal.Shade);
-            g.Rect(bx + 1, oy + 1, 2, 1, Pal.Mix(Pal.Light, Pal.White, 0.35));   // tiny specular
+            sp.DrawBody(g, L, ox, oy, low);
+            if (L.Suit) DrawSuit(g, L, sp, ox, oy);
+            else sp.DrawFace(g, L, ox, oy, L.Eye);
 
-            if (L.Suit)
-            {
-                for (int i = 1; i < parts.Count; i++) { double[] q = parts[i]; g.Rect(q[0], q[1], (int)q[2], (int)q[3], Pal.SuitRed); }
-                g.Rect(bx, oy, bw, 8, Pal.SuitRed); g.Rect(bx, oy + 8, bw, 4, Pal.SuitBlue);
-                for (int i = 0; i < 4; i++) g.Rect(ox + legX[i], oy + 12, 2, legH[i], Pal.SuitBlue);
-                foreach (int wx in new[] { 3, 7, 10 }) g.Rect(bx + wx, oy + 1, 1, 7, Pal.WebLine);
-                g.Rect(bx + 1, oy + 3, bw - 2, 1, Pal.WebLine); g.Rect(bx + 1, oy + 6, bw - 2, 1, Pal.WebLine);
-                g.Rect(bx, oy, bw, 1, Pal.SuitLight); g.Rect(bx, oy + 1, 1, 7, Pal.SuitLight);
-                g.Rect(ox + 10, oy + 6, 2, 2, Pal.Eye);
-                g.Dot(ox + 9, oy + 5, Pal.Eye); g.Dot(ox + 12, oy + 5, Pal.Eye); g.Dot(ox + 9, oy + 8, Pal.Eye); g.Dot(ox + 12, oy + 8, Pal.Eye);
-                foreach (double mx in new[] { ox + 5, ox + 13 })
-                {
-                    g.Rect(mx, oy + 2, 4, 4, Pal.Eye);
-                    if (L.Blink) g.Rect(mx + 1, oy + 4, 2, 1, Pal.White);
-                    else { g.Rect(mx + 1, oy + 3, 2, 2, Pal.White); g.Rect(mx + 1, oy + 2, 2, 1, Pal.Eye); }
-                }
-            }
-            else DrawFace(g, L, ox, oy, e);
-
-            // ---- props ----
+            // ---- props (shared by every pet, placed with the species' anchors) ----
+            double top = oy + sp.HeadTop;
             if (L.Headphones && !L.Suit)
             {
-                g.Rect(ox + 4, oy - 2, 14, 1, Pal.Phones); g.Rect(ox + 3, oy - 1, 1, 3, Pal.Phones); g.Rect(ox + 18, oy - 1, 1, 3, Pal.Phones);
-                g.Rect(ox + 2, oy + 2, 3, 4, Pal.Phones); g.Rect(ox + 17, oy + 2, 3, 4, Pal.Phones);
-                g.Rect(ox + 2, oy + 2, 1, 4, Pal.PhonesHi); g.Rect(ox + 17, oy + 2, 1, 4, Pal.PhonesHi);
+                g.Rect(ox + 4, top - 2, 14, 1, Pal.Phones); g.Rect(ox + 3, top - 1, 1, 3, Pal.Phones); g.Rect(ox + 18, top - 1, 1, 3, Pal.Phones);
+                g.Rect(ox + 2, top + 2, 3, 4, Pal.Phones); g.Rect(ox + 17, top + 2, 3, 4, Pal.Phones);
+                g.Rect(ox + 2, top + 2, 1, 4, Pal.PhonesHi); g.Rect(ox + 17, top + 2, 1, 4, Pal.PhonesHi);
             }
             if (L.Nightcap && !L.Suit)
             {
-                g.Rect(ox + 5, oy - 1, 12, 2, Pal.Cap); g.Rect(ox + 7, oy - 3, 9, 2, Pal.Cap); g.Rect(ox + 10, oy - 5, 7, 2, Pal.Cap);
-                g.Rect(ox + 14, oy - 6, 4, 1, Pal.Cap); g.Rect(ox + 5, oy - 1, 12, 1, Pal.CapHi);
-                g.Rect(ox + 17, oy - 7, 2, 2, Pal.Pom);
+                g.Rect(ox + 5, top - 1, 12, 2, Pal.Cap); g.Rect(ox + 7, top - 3, 9, 2, Pal.Cap); g.Rect(ox + 10, top - 5, 7, 2, Pal.Cap);
+                g.Rect(ox + 14, top - 6, 4, 1, Pal.Cap); g.Rect(ox + 5, top - 1, 12, 1, Pal.CapHi);
+                g.Rect(ox + 17, top - 7, 2, 2, Pal.Pom);
             }
             if (L.Mug != "none")
             {
                 double mx, my;
-                if (L.Mug == "sip") { mx = ox + 17; my = oy + 4; } else { mx = ox + 21; my = oy + 1; }
+                if (L.Mug == "sip") { mx = ox + sp.MugSipX; my = oy + sp.MugSipY; } else { mx = ox + sp.MugHoldX; my = oy + sp.MugHoldY; }
                 g.Rect(mx - 1, my - 1, 6, 7, Pal.Outline); g.Rect(mx + 5, my + 1, 1, 3, Pal.Outline);
                 g.Rect(mx, my, 4, 5, Pal.White); g.Rect(mx, my, 4, 1, Pal.Coffee);
             }
-            if (L.Held != "none") Food.DrawInto(g, L.Held, ox + 8, oy + (L.HeldUp ? 5 : 8), L.HeldLeft);
+            if (L.Held != "none") Food.DrawInto(g, L.Held, ox + sp.HeldX, oy + (L.HeldUp ? sp.HeldUpY : sp.HeldY), L.HeldLeft);
             if (L.Laptop == "open")
             {
                 int glow = L.Glow == "red" ? Pal.Red : Pal.Blue;
@@ -220,64 +165,43 @@ namespace Clawd
             {
                 g.Rect(ox - 1, L.LapRow - 1, 24, 4, Pal.Outline); g.Rect(ox, L.LapRow, 22, 1, Pal.Silver); g.Rect(ox, L.LapRow + 1, 22, 1, Pal.Dark);
             }
-            if (L.Bang) { g.Rect(ox + 10, oy - 12, 2, 4, Pal.Red); g.Rect(ox + 10, oy - 7, 2, 2, Pal.Red); }
+            if (L.Bang) { g.Rect(ox + sp.BangX, oy + sp.BangY, 2, 4, Pal.Red); g.Rect(ox + sp.BangX, oy + sp.BangY + 5, 2, 2, Pal.Red); }
         }
 
-        static void DrawFace(Cells g, Look L, double ox, double oy, int e)
+        // web-slinger suit, for any pet: recolour his body-coloured pixels (red on top, blue below),
+        // add web lines on the red part, the chest spider and the mask eyes
+        static void DrawSuit(Cells g, Look L, Species sp, double ox, double oy)
         {
-            string style = L.EyeStyle;
-            if (L.Blink && (style == "normal" || style == "up" || style == "down" || style == "sad")) style = "blink";
-            double ex1 = ox + 6 + 2 * e, ex2 = ox + 14 + 2 * e;
-            if (style == "angry")
-            {
-                g.Rect(ex1, oy + 3, 2, 3, Pal.Eye); g.Rect(ex2, oy + 3, 2, 3, Pal.Eye);
-                g.Rect(ex1 - 1, oy + 1, 2, 1, Pal.Eye); g.Rect(ex1 + 1, oy + 2, 2, 1, Pal.Eye);
-                g.Rect(ex2 + 1, oy + 1, 2, 1, Pal.Eye); g.Rect(ex2 - 1, oy + 2, 2, 1, Pal.Eye);
-            }
-            else if (style == "sad")
-            {
-                g.Rect(ex1, oy + 3, 2, 3, Pal.Eye); g.Rect(ex2, oy + 3, 2, 3, Pal.Eye);
-                g.Dot(ex1 + 1, oy + 3, Pal.Shine); g.Dot(ex2 + 1, oy + 3, Pal.Shine);
-                g.Rect(ex1 + 1, oy + 1, 2, 1, Pal.Eye); g.Rect(ex1 - 1, oy + 2, 2, 1, Pal.Eye);
-                g.Rect(ex2 - 1, oy + 1, 2, 1, Pal.Eye); g.Rect(ex2 + 1, oy + 2, 2, 1, Pal.Eye);
-            }
-            else
-            {
-                foreach (double ex in new[] { ex1, ex2 })
+            int split = (int)Math.Floor(oy + sp.SuitSplitY);
+            for (int y = 0; y < g.H; y++)
+                for (int x = 0; x < g.W; x++)
                 {
-                    switch (style)
-                    {
-                        case "normal": g.Rect(ex, oy + 2, 2, 4, Pal.Eye); g.Dot(ex + 1, oy + 2, Pal.Shine); break;
-                        case "up": g.Rect(ex, oy + 1, 2, 4, Pal.Eye); g.Dot(ex + 1, oy + 1, Pal.Shine); break;
-                        case "down": g.Rect(ex, oy + 3, 2, 4, Pal.Eye); break;
-                        case "wide": g.Rect(ex - 1, oy + 2, 3, 4, Pal.Eye); g.Rect(ex, oy + 2, 1, 2, Pal.Shine); break;
-                        case "blink": g.Rect(ex, oy + 4, 2, 1, Pal.Eye); break;
-                        case "sleep": g.Dot(ex - 1, oy + 3, Pal.Eye); g.Rect(ex, oy + 4, 2, 1, Pal.Eye); g.Dot(ex + 2, oy + 3, Pal.Eye); break;
-                        case "happy": g.Dot(ex - 1, oy + 4, Pal.Eye); g.Rect(ex, oy + 3, 2, 1, Pal.Eye); g.Dot(ex + 2, oy + 4, Pal.Eye); break;
-                        case "dizzy":
-                            g.Dot(ex, oy + 2, Pal.Eye); g.Dot(ex + 2, oy + 2, Pal.Eye); g.Dot(ex + 1, oy + 3, Pal.Eye);
-                            g.Dot(ex, oy + 4, Pal.Eye); g.Dot(ex + 2, oy + 4, Pal.Eye); break;
-                        case "heart": g.Glyph("heart", ex - 1, oy + 2, Pal.Heart); break;
-                    }
+                    int c = g.Px[y * g.W + x];
+                    if (c != sp.Body && c != sp.Light && c != sp.Shade && c != sp.Specular) continue;
+                    g.Px[y * g.W + x] = y >= split ? Pal.SuitBlue : (c == sp.Light ? Pal.SuitLight : Pal.SuitRed);
                 }
-            }
-            if (L.Blush) { g.Rect(ox + 5, oy + 7, 2, 1, Pal.Blush); g.Rect(ox + 15, oy + 7, 2, 1, Pal.Blush); }
-            switch (L.Mouth)
+            int wx0 = (int)Math.Floor(ox + sp.WebX0), wx1 = (int)Math.Floor(ox + sp.WebX1), wy0 = (int)Math.Floor(oy + sp.WebY0), wy1 = (int)Math.Floor(oy + sp.WebY1);
+            Action<int, int> web = (x, y) => { if (g.Get(x, y) == Pal.SuitRed) g.Px[y * g.W + x] = Pal.WebLine; };
+            foreach (double cx in sp.WebCols) for (int y = wy0; y <= wy1; y++) web((int)Math.Floor(ox + cx), y);
+            foreach (double ry in sp.WebRows) for (int x = wx0; x <= wx1; x++) web(x, (int)Math.Floor(oy + ry));
+            double chx = ox + sp.ChestX, chy = oy + sp.ChestY;
+            g.Rect(chx, chy, 2, 2, Pal.Eye);
+            g.Dot(chx - 1, chy - 1, Pal.Eye); g.Dot(chx + 2, chy - 1, Pal.Eye); g.Dot(chx - 1, chy + 2, Pal.Eye); g.Dot(chx + 2, chy + 2, Pal.Eye);
+            foreach (double mx in new[] { ox + sp.MaskLX, ox + sp.MaskRX })
             {
-                case "o": g.Rect(ox + 10, oy + 7, 2, 2, Pal.Eye); break;
-                case "smile": g.Dot(ox + 9, oy + 7, Pal.Eye); g.Rect(ox + 10, oy + 8, 2, 1, Pal.Eye); g.Dot(ox + 12, oy + 7, Pal.Eye); break;
-                case "frown": g.Dot(ox + 9, oy + 8, Pal.Eye); g.Rect(ox + 10, oy + 7, 2, 1, Pal.Eye); g.Dot(ox + 12, oy + 8, Pal.Eye); break;
-                case "yawn": g.Rect(ox + 9, oy + 7, 4, 3, Pal.Eye); g.Rect(ox + 10, oy + 9, 2, 1, Pal.Tongue); break;
-                case "chomp": g.Rect(ox + 8, oy + 7, 6, 3, Pal.Eye); g.Rect(ox + 9, oy + 9, 4, 1, Pal.Tongue); break;
-                case "chew": g.Rect(ox + 9, oy + 8, 4, 1, Pal.Eye); break;
+                double my = oy + sp.MaskY;
+                g.Rect(mx, my, 4, 4, Pal.Eye);
+                if (L.Blink) g.Rect(mx + 1, my + 2, 2, 1, Pal.White);
+                else { g.Rect(mx + 1, my + 1, 2, 2, Pal.White); g.Rect(mx + 1, my, 2, 1, Pal.Eye); }
             }
         }
 
         // movie night, seen from behind: dark body (the renderer adds the screen-coloured rim glow)
         public static void DrawBack(Cells g, Look L)
         {
+            Species sp = SpeciesList.Current;
             double ox = OX + L.Wob, oy = OY + 2;
-            int rim = L.Rim, band = Pal.Mix(Pal.Back, L.Rim, 0.4);
+            int rim = L.Rim;
             double bx2 = ox + 22, by2 = oy + 7;
             g.Rect(bx2 - 1, by2 - 3, 8, 11, Pal.Outline); g.Rect(bx2, by2 - 4, 6, 1, Pal.Outline);
             for (int col = 0; col < 6; col++) g.Rect(bx2 + col, by2, 1, 7, col % 2 == 0 ? Pal.BucketRed : Pal.BucketWhite);
@@ -285,23 +209,9 @@ namespace Clawd
             g.Rect(bx2, by2 - 2, 6, 2, Pal.Kernel); g.Rect(bx2 + 1, by2 - 3, 4, 1, Pal.Kernel);
             g.Dot(bx2 + 1, by2 - 1, Pal.KernelShade); g.Dot(bx2 + 4, by2 - 2, Pal.KernelShade);
 
-            var parts = new List<double[]>();
-            parts.Add(new double[] { ox + 4, oy, 14, 12 });
-            parts.Add(new double[] { ox, oy + 6, 4, 2 });
-            if (L.Arms == "reach") parts.Add(new double[] { ox + 18, oy + 6, 5, 2 });
-            else if (L.Arms == "eat") parts.Add(new double[] { ox + 18, oy + 1, 2, 7 });
-            else parts.Add(new double[] { ox + 18, oy + 6, 4, 2 });
-            int rimLine = Pal.Mix(Pal.Outline, rim, 0.8);       // backlit: his outline glows in the screen's colour
-            foreach (double[] q in parts) g.Rect(q[0] - 1, q[1] - 1, (int)q[2] + 2, (int)q[3] + 2, rimLine);
-            g.Rect(ox + 3, oy + 12, 1, 3, rimLine); g.Rect(ox + 18, oy + 12, 1, 3, rimLine);
-            foreach (double[] q in parts) g.Rect(q[0], q[1], (int)q[2], (int)q[3], Pal.Back);
-            g.Rect(ox + 4, oy + 12, 14, 1, Pal.Back);
-            foreach (int c in new[] { 4, 8, 12, 16 }) g.Rect(ox + c, oy + 12, 2, 2, Pal.Back);
-            // screen light wrapping round his edges
-            g.Rect(ox + 4, oy, 14, 1, band); g.Rect(ox + 4, oy + 1, 1, 11, band); g.Rect(ox + 17, oy + 1, 1, 11, band);
-            g.Rect(ox, oy + 6, 4, 1, band);
-            if (L.Arms == "eat") g.Rect(ox + 18, oy + 1, 1, 7, band); else g.Rect(ox + 18, oy + 6, 4, 1, band);
-            if (L.Headphones) { g.Rect(ox + 4, oy - 2, 14, 1, Pal.Phones); g.Rect(ox + 3, oy - 1, 1, 3, Pal.Phones); g.Rect(ox + 18, oy - 1, 1, 3, Pal.Phones); }
+            sp.DrawBack(g, L, ox, oy);
+            double top = oy + sp.HeadTop;
+            if (L.Headphones) { g.Rect(ox + 4, top - 2, 14, 1, Pal.Phones); g.Rect(ox + 3, top - 1, 1, 3, Pal.Phones); g.Rect(ox + 18, top - 1, 1, 3, Pal.Phones); }
         }
 
         // the pistol, pointing right; pivot (hand) at grip centre (2, 4.5), muzzle tip at (11, 2)
@@ -329,7 +239,7 @@ namespace Clawd
         {
             Cells g = new Cells(24, 24);
             Look L = new Look();
-            // draw a mini Clawd centred: reuse DrawFront on a temp canvas and copy his box
+            // draw a mini pet centred: reuse DrawFront on a temp canvas and copy his box
             Cells big = new Cells(CW, CH); DrawFront(big, L);
             for (int y = 0; y < 18; y++) for (int x = 0; x < 24; x++) g.Px[(y + 3) * 24 + x] = big.Get(OX - 1 + x, OY - 1 + y);
             Bitmap src = g.ToBitmap();

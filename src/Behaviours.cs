@@ -445,7 +445,7 @@ namespace Clawd
                 case "heropose":
                     Y = ground; rot = 0;
                     if (t < 100) { L.Sit = true; L.Arms = travel > 0 ? "upR" : "upL"; }
-                    if (t == 16) Chat(Pick(new[] { "nailed it.", "stuck the landing", "your friendly neighbourhood Clawd" }), 110);
+                    if (t == 16) Chat(Pick(new[] { "nailed it.", "stuck the landing", "your friendly neighbourhood " + SpeciesList.Current.ShortName }), 110);
                     if (t == 140) { Poof(); suit = false; }
                     if (t >= 180) Set("idle", 60);
                     break;

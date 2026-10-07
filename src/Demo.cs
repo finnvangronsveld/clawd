@@ -222,7 +222,7 @@ namespace Clawd
                 using (SolidBrush lb = new SolidBrush(Color.FromArgb(214, 210, 204)))
                     for (int i = 0; i < 5; i++) sg.FillRectangle(lb, content.Left, content.Top + 4 + i * 14, content.Width - (i % 2) * 60 - 20, 6);
             using (SolidBrush tk = new SolidBrush(Color.FromArgb(235, 22, 24, 34))) sg.FillRectangle(tk, 0, SH - TASK, SW, TASK);
-            for (int i = 0; i < 6; i++) using (SolidBrush ic = new SolidBrush(Color.FromArgb(i == 2 ? Pal.Orange : Pal.C(70, 76, 96)))) sg.FillEllipse(ic, SW / 2 - 90 + i * 30, SH - TASK + 6, 18, 18);
+            for (int i = 0; i < 6; i++) using (SolidBrush ic = new SolidBrush(Color.FromArgb(i == 2 ? SpeciesList.Current.Accent : Pal.C(70, 76, 96)))) sg.FillEllipse(ic, SW / 2 - 90 + i * 30, SH - TASK + 6, 18, 18);
             sg.SmoothingMode = SmoothingMode.None;
 
             if (food != null)

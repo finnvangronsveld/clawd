@@ -104,16 +104,16 @@ namespace Clawd
             f.Font = new Font("Segoe UI", 9.75f); f.ClientSize = new Size(440, 640); f.ShowIcon = true;
             try { f.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
 
-            Panel head = new Panel(); head.Dock = DockStyle.Top; head.Height = 64; head.BackColor = Color.FromArgb(Pal.Orange);
+            Panel head = new Panel(); head.Dock = DockStyle.Top; head.Height = 64; head.BackColor = Color.FromArgb(SpeciesList.Current.Accent);
             PictureBox pic = new PictureBox(); pic.Image = Sprite.IconArt(48); pic.SizeMode = PictureBoxSizeMode.Zoom; pic.SetBounds(14, 8, 48, 48); pic.BackColor = Color.Transparent;
-            Label title = new Label(); title.Text = "Clawd"; title.Font = new Font("Segoe UI Semibold", 16f); title.ForeColor = Color.White; title.AutoSize = true; title.Location = new Point(70, 8);
-            Label sub = new Label(); sub.Text = "your little desktop buddy"; sub.ForeColor = Color.FromArgb(255, 235, 225); sub.AutoSize = true; sub.Location = new Point(73, 38);
+            Label title = new Label(); title.Text = SpeciesList.Current.ShortName; title.Font = new Font("Segoe UI Semibold", 16f); title.ForeColor = Color.White; title.AutoSize = true; title.Location = new Point(70, 8);
+            Label sub = new Label(); sub.Text = SpeciesList.Current.Tagline; sub.ForeColor = Color.FromArgb(255, 235, 225); sub.AutoSize = true; sub.Location = new Point(73, 38);
             head.Controls.Add(pic); head.Controls.Add(title); head.Controls.Add(sub);
 
             FlowLayoutPanel body = new FlowLayoutPanel(); body.Dock = DockStyle.Fill; body.FlowDirection = FlowDirection.TopDown; body.WrapContents = false;
             body.Padding = new Padding(18, 12, 18, 12); body.AutoScroll = true;
 
-            Func<string, Label> section = t => { Label l = new Label(); l.Text = t; l.Font = new Font("Segoe UI Semibold", 10.5f); l.ForeColor = Color.FromArgb(Pal.Shade); l.AutoSize = true; l.Margin = new Padding(0, 10, 0, 4); return l; };
+            Func<string, Label> section = t => { Label l = new Label(); l.Text = t; l.Font = new Font("Segoe UI Semibold", 10.5f); l.ForeColor = Color.FromArgb(SpeciesList.Current.Shade); l.AutoSize = true; l.Margin = new Padding(0, 10, 0, 4); return l; };
             body.Controls.Add(section("What he does"));
             foreach (string[] lab in Labels)
             {
@@ -135,7 +135,7 @@ namespace Clawd
             reset.FlatStyle = FlatStyle.System; reset.Click += (s, e) => resetNeeds();
             body.Controls.Add(reset);
             Label note = new Label(); note.AutoSize = true; note.MaximumSize = new Size(390, 0); note.ForeColor = Color.Gray; note.Margin = new Padding(2, 14, 0, 0);
-            note.Text = "Everything stays on this PC. Clawd only counts key presses (never which keys), reads the title of the window in front to notice videos, and reads play/pause from Windows' media controls.";
+            note.Text = "Everything stays on this PC. He only counts key presses (never which keys), reads the title of the window in front to notice videos, and reads play/pause from Windows' media controls.";
             body.Controls.Add(note);
 
             f.Controls.Add(body); f.Controls.Add(head);

@@ -30,6 +30,7 @@ namespace Clawd
             Application.SetCompatibleTextRenderingDefault(false);
 
             if (args.Length >= 2 && args[0] == "--render-frames") { return Demo.Render(args[1]); }
+            if (args.Length >= 2 && args[0] == "--dump-sprites") { return DevTools.DumpSprites(args[1]); }
 
             // test switches (for development): --test runs a second instance, --mode X forces a behaviour, --verbose logs
             bool test = Array.IndexOf(args, "--test") >= 0;
