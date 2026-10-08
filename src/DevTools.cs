@@ -70,6 +70,12 @@ namespace Flippy
             add("suit_up", L => { L.Suit = true; L.Arms = "up"; });
             add("suit_down", L => { L.Suit = true; L.Arms = "down"; });
             add("suit_sit_upR", L => { L.Suit = true; L.Sit = true; L.Arms = "upR"; });
+            add("hero_caped", L => { L.Suit = true; L.Hero = "caped"; });
+            add("hero_caped_fly", L => { L.Suit = true; L.Hero = "caped"; L.Cape = 1; L.Arms = "upR"; });
+            add("hero_speed", L => { L.Suit = true; L.Hero = "speed"; L.Phase = 1; });
+            add("hero_night", L => { L.Suit = true; L.Hero = "night"; });
+            add("hero_night_glide", L => { L.Suit = true; L.Hero = "night"; L.Cape = 2; L.Arms = "up"; });
+            add("hero_shield", L => { L.Suit = true; L.Hero = "shield"; L.ShieldHeld = true; });
             foreach (double deg in new[] { -110.0, -45, 0, 30 }) { double d = deg; add("aim_r_" + (int)deg, L => { L.Arms = "aim"; L.Gun = true; L.AimSide = 1; L.AimDeg = d; }); }
             foreach (double deg in new[] { 200.0, 180, 150 }) { double d = deg; add("aim_l_" + (int)deg, L => { L.Arms = "aim"; L.Gun = true; L.AimSide = -1; L.AimDeg = d; }); }
             add("aim_sit", L => { L.Arms = "aim"; L.Gun = true; L.AimSide = 1; L.AimDeg = -20; L.Sit = true; });

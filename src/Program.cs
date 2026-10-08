@@ -9,14 +9,14 @@ using System.Windows.Forms;
 [assembly: AssemblyTitle("Flippy")]
 [assembly: AssemblyProduct("Flippy")]
 [assembly: AssemblyDescription("A little desktop buddy")]
-[assembly: AssemblyVersion("2.5.0.0")]
-[assembly: AssemblyFileVersion("2.5.0.0")]
+[assembly: AssemblyVersion("2.6.0.0")]
+[assembly: AssemblyFileVersion("2.6.0.0")]
 
 namespace Flippy
 {
     static class Program
     {
-        public const string Version = "2.5";
+        public const string Version = "2.6";
         static Pet pet;
         static Settings cfg;
         static Needs needs;

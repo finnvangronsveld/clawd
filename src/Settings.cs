@@ -51,7 +51,7 @@ namespace Flippy
     {
         // features
         public bool Gun = true, Tricks = true, WebSwing = true, Smash = true, MovieNight = true, PauseTantrum = true,
-                    Commentary = true, TypeAlong = true, Climbing = true, Needs = true, PcReactions = true, Music = true, ClaudeAlerts = true;
+                    Commentary = true, TypeAlong = true, Climbing = true, Needs = true, PcReactions = true, Music = true, ClaudeAlerts = true, Sandcastles = true, Battles = true;
         // sliders
         public double Size = 1.0;        // 0.5 .. 2
         public double Activity = 1.0;    // 0.3 (calm) .. 2 (hyper)
@@ -59,18 +59,18 @@ namespace Flippy
         public string Pet = "phone";     // which pet (species id); unknown ids (e.g. the retired "flippy" blob) fall back to the default
         public event Action Changed;
 
-        static readonly string[] keys = { "Gun", "Tricks", "WebSwing", "Smash", "MovieNight", "PauseTantrum", "Commentary", "TypeAlong", "Climbing", "Needs", "PcReactions", "Music", "ClaudeAlerts" };
+        static readonly string[] keys = { "Gun", "Tricks", "WebSwing", "Smash", "MovieNight", "PauseTantrum", "Commentary", "TypeAlong", "Climbing", "Needs", "PcReactions", "Music", "ClaudeAlerts", "Sandcastles", "Battles" };
         bool Get(string k)
         {
             switch (k) { case "Gun": return Gun; case "Tricks": return Tricks; case "WebSwing": return WebSwing; case "Smash": return Smash; case "MovieNight": return MovieNight;
                 case "PauseTantrum": return PauseTantrum; case "Commentary": return Commentary; case "TypeAlong": return TypeAlong; case "Climbing": return Climbing;
-                case "Needs": return Needs; case "PcReactions": return PcReactions; case "ClaudeAlerts": return ClaudeAlerts; default: return Music; }
+                case "Needs": return Needs; case "PcReactions": return PcReactions; case "ClaudeAlerts": return ClaudeAlerts; case "Sandcastles": return Sandcastles; case "Battles": return Battles; default: return Music; }
         }
         void Set(string k, bool v)
         {
             switch (k) { case "Gun": Gun = v; break; case "Tricks": Tricks = v; break; case "WebSwing": WebSwing = v; break; case "Smash": Smash = v; break;
                 case "MovieNight": MovieNight = v; break; case "PauseTantrum": PauseTantrum = v; break; case "Commentary": Commentary = v; break;
-                case "TypeAlong": TypeAlong = v; break; case "Climbing": Climbing = v; break; case "Needs": Needs = v; break; case "PcReactions": PcReactions = v; break; case "ClaudeAlerts": ClaudeAlerts = v; break; default: Music = v; break; }
+                case "TypeAlong": TypeAlong = v; break; case "Climbing": Climbing = v; break; case "Needs": Needs = v; break; case "PcReactions": PcReactions = v; break; case "ClaudeAlerts": ClaudeAlerts = v; break; case "Sandcastles": Sandcastles = v; break; case "Battles": Battles = v; break; default: Music = v; break; }
         }
         public void Load()
         {
@@ -97,7 +97,7 @@ namespace Flippy
             new[] { "PauseTantrum", "Gets mad when you pause the video" }, new[] { "Commentary", "Comments while watching" },
             new[] { "Music", "Bops along to your music" }, new[] { "Climbing", "Climbs onto your windows" },
             new[] { "Needs", "Gets hungry, tired, bored (and needs love)" }, new[] { "PcReactions", "Reacts to your PC (battery, late nights, copying, busy CPU)" },
-            new[] { "Gun", "Pellet gun" }, new[] { "Tricks", "Trickshots" }, new[] { "WebSwing", "Web-slinger suit" }, new[] { "Smash", "Smashes his laptop" } };
+            new[] { "Gun", "Pellet gun" }, new[] { "Tricks", "Trickshots" }, new[] { "WebSwing", "Superhero suits (web-slinger, caped flyer, speedster, night guardian, shield hero)" }, new[] { "Battles", "Anime battles with his shadow" }, new[] { "Sandcastles", "Builds sandcastles in a corner" }, new[] { "Smash", "Smashes his laptop" } };
 
         public Form BuildForm(Func<bool> getStartup, Action<bool> setStartup, Action resetNeeds, Action<string> switchPet)
         {

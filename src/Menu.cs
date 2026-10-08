@@ -84,7 +84,12 @@ namespace Flippy
         // at = the top of his head; the hologram goes above it
         public void Show(List<MenuItem> it, double[] nd, Point at, Native.RECT wk, float scale)
         {
-            items = it; needs = nd; anchor = at; work = wk; sc = scale;
+            // keep the buttons of one group together (in the order the groups first appear), rows after them
+            var order = new List<string>(); foreach (MenuItem m in it) if (m.Group != null && !order.Contains(m.Group)) order.Add(m.Group);
+            var sorted = new List<MenuItem>();
+            foreach (string gname in order) foreach (MenuItem m in it) if (m.Group == gname) sorted.Add(m);
+            foreach (MenuItem m in it) if (m.Group == null) sorted.Add(m);
+            items = sorted; needs = nd; anchor = at; work = wk; sc = scale;
             hover = -1; pressed = -1; Page = "main"; Open = true; openT = 0;
             Draw();
             win.KeepOnTop();

@@ -91,17 +91,21 @@ namespace Flippy
         public bool Blush, Sit, Squash, Bang, Suit, Back, Headphones, Nightcap, Blink, Spin;
         public bool Gun, Recoil, Flash; public double AimDeg; public int AimSide = 1;
         public int Rim = Pal.C(165, 212, 255);
+        public string Hero = "web";       // which suit, when Suit is on: web, caped, speed, night, shield
+        public int Cape;                   // 0 = hanging, 1 = streaming behind (flying), 2 = spread wide (gliding)
+        public bool ShieldHeld;            // the shield hero has his shield on his arm
         // everything that affects the picture, as one string (so unchanged frames can be skipped)
         public string Key()
         {
             return Arms + EyeStyle + Mouth + Laptop + Glow + Mug + Held + HeldLeft + HeldUp + Eye + Phase + Wob + LapRow + Blush + Sit + Squash + Bang + Suit + Back
-                   + Face + TuftLift + Headphones + Nightcap + Blink + Gun + Recoil + Flash + (int)AimDeg + AimSide + Rim;
+                   + Face + TuftLift + Headphones + Nightcap + Blink + Gun + Recoil + Flash + (int)AimDeg + AimSide + Rim
+                   + (Suit ? Hero + Cape + ShieldHeld : "");
         }
         public void Reset()
         {
             Arms = "out"; EyeStyle = "normal"; Mouth = "none"; Laptop = "none"; Mug = "none"; Held = "none";
             Phase = 0; Wob = 0; Blush = Sit = Squash = Bang = Back = Spin = false; Gun = Recoil = Flash = false;
-            Headphones = Nightcap = HeldUp = false; HeldLeft = 1; TuftLift = 0;
+            Headphones = Nightcap = HeldUp = false; HeldLeft = 1; TuftLift = 0; Cape = 0; ShieldHeld = false;
         }
     }
 
@@ -128,8 +132,11 @@ namespace Flippy
             bool low = L.Sit || L.Squash;
             if (low) oy += 2;
 
+            bool caped = L.Suit && (L.Hero == "caped" || L.Hero == "night");
+            if (caped) DrawCape(g, L, sp, ox, oy);      // behind him
             sp.DrawBody(g, L, ox, oy, low);
-            if (L.Suit) DrawSuit(g, L, sp, ox, oy);
+            if (L.Suit && L.Hero == "web") DrawSuit(g, L, sp, ox, oy);
+            else if (L.Suit) DrawHero(g, L, sp, ox, oy);
             else sp.DrawFace(g, L, ox, oy, L.Eye);
 
             // ---- props (shared by every pet, placed with the species' anchors) ----
@@ -193,6 +200,122 @@ namespace Flippy
                 g.Rect(mx, my, 4, 4, Pal.Eye);
                 if (L.Blink) g.Rect(mx + 1, my + 2, 2, 1, Pal.White);
                 else { g.Rect(mx + 1, my + 1, 2, 2, Pal.White); g.Rect(mx + 1, my, 2, 1, Pal.Eye); }
+            }
+        }
+
+        // ---- the other superhero suits (all generic, no real characters) ----
+        static void Recolour(Cells g, Species sp, int split, Func<int, bool, int> pick)
+        {
+            for (int y = 0; y < g.H; y++)
+                for (int x = 0; x < g.W; x++)
+                {
+                    int c = g.Px[y * g.W + x];
+                    if (c != sp.Body && c != sp.Light && c != sp.Shade && c != sp.Specular) continue;
+                    int k = c == sp.Light || c == sp.Specular ? 1 : c == sp.Shade ? 2 : 0;
+                    g.Px[y * g.W + x] = Shade(pick(y, y < split), k);
+                }
+        }
+        static int Shade(int c, int k)
+        {
+            int r = (c >> 16) & 255, gg = (c >> 8) & 255, b = c & 255;
+            double f = k == 1 ? 1.25 : k == 2 ? 0.72 : 1.0;
+            return Pal.C(Math.Min(255, (int)(r * f + (k == 1 ? 18 : 0))), Math.Min(255, (int)(gg * f + (k == 1 ? 18 : 0))), Math.Min(255, (int)(b * f + (k == 1 ? 18 : 0))));
+        }
+        static void DrawHero(Cells g, Look L, Species sp, double ox, double oy)
+        {
+            int split = (int)Math.Floor(oy + sp.SuitSplitY);
+            double chx = ox + sp.ChestX, chy = oy + sp.ChestY, top = oy + sp.HeadTop;
+            switch (L.Hero)
+            {
+                case "caped":       // caped flyer: blue, red below, a gold emblem
+                    Recolour(g, sp, split, (y, up) => up ? Pal.C(42, 92, 200) : Pal.C(200, 40, 52));
+                    sp.DrawFace(g, L, ox, oy, L.Eye);
+                    g.Rect(chx - 2, chy - 1, 6, 4, Pal.C(120, 20, 30)); g.Rect(chx - 1, chy - 1, 4, 3, Pal.C(255, 206, 60)); g.Rect(chx, chy, 2, 1, Pal.C(200, 40, 52));
+                    break;
+                case "speed":       // speedster: all red, a lightning bolt, little bolts at the sides of his head
+                    Recolour(g, sp, split, (y, up) => Pal.C(206, 36, 42));
+                    sp.DrawFace(g, L, ox, oy, L.Eye);
+                    g.Rect(chx - 1, chy - 2, 4, 5, Pal.C(255, 236, 140));
+                    g.Dot(chx + 2, chy - 2, Pal.C(230, 170, 30)); g.Dot(chx + 1, chy - 1, Pal.C(230, 170, 30)); g.Rect(chx, chy, 2, 1, Pal.C(230, 170, 30)); g.Dot(chx, chy + 1, Pal.C(230, 170, 30)); g.Dot(chx - 1, chy + 2, Pal.C(230, 170, 30));
+                    foreach (double ex in new[] { ox + 1, ox + 20 })
+                    { g.Dot(ex, top + 1, Pal.C(255, 214, 60)); g.Dot(ex + (ex < ox + 10 ? -1 : 1), top, Pal.C(255, 214, 60)); g.Dot(ex, top + 2, Pal.C(255, 214, 60)); }
+                    break;
+                case "night":       // night guardian: dark grey, a yellow belt, a bat emblem, white slit eyes, cowl ears
+                    Recolour(g, sp, split, (y, up) => up ? Pal.C(62, 64, 80) : Pal.C(44, 44, 56));
+                    for (int x = 0; x < g.W; x++) if (g.Get(x, split) == Pal.C(44, 44, 56) || g.Get(x, split) == Shade(Pal.C(44, 44, 56), 1) || g.Get(x, split) == Shade(Pal.C(44, 44, 56), 2)) g.Px[split * g.W + x] = Pal.C(236, 196, 60);
+                    g.Rect(chx - 2, chy - 1, 6, 3, Pal.C(236, 196, 60)); g.Rect(chx - 1, chy, 4, 1, Pal.Eye); g.Dot(chx - 2, chy - 1, Pal.Eye); g.Dot(chx + 3, chy - 1, Pal.Eye);
+                    foreach (double mx in new[] { ox + sp.MaskLX, ox + sp.MaskRX })
+                    {
+                        double my = oy + sp.MaskY;
+                        g.Rect(mx, my, 4, 3, Pal.C(30, 30, 40));
+                        if (!L.Blink) g.Rect(mx + 1, my + 1, 2, 1, Pal.White);
+                    }
+                    foreach (double ex in new[] { ox + sp.MaskLX + 1, ox + sp.MaskRX + 1 })
+                    { g.Rect(ex, top - 2, 2, 2, Pal.C(44, 44, 56)); g.Dot(ex, top - 3, Pal.C(44, 44, 56)); }
+                    break;
+                case "shield":      // shield hero: blue with a white star, red and white stripes below
+                    Recolour(g, sp, split, (y, up) => up ? Pal.C(42, 80, 176) : ((y - split) % 2 == 0 ? Pal.C(204, 40, 50) : Pal.C(236, 236, 240)));
+                    sp.DrawFace(g, L, ox, oy, L.Eye);
+                    g.Rect(chx, chy - 1, 2, 4, Pal.White); g.Rect(chx - 1, chy, 4, 2, Pal.White);
+                    if (L.ShieldHeld) DrawShield(g, ox + 20, oy + 9);
+                    break;
+            }
+        }
+        // the round shield (also used for the thrown one): rings, a blue middle, a white star
+        public static void DrawShield(Cells g, double cx, double cy)
+        {
+            for (int y = -4; y <= 4; y++)
+                for (int x = -4; x <= 4; x++)
+                {
+                    double d = Math.Sqrt(x * x + y * y);
+                    if (d > 4.6) continue;
+                    int c = d > 3.8 ? Pal.Outline : d > 2.9 ? Pal.C(204, 40, 50) : d > 2.0 ? Pal.C(236, 236, 240) : d > 1.2 ? Pal.C(204, 40, 50) : Pal.C(42, 80, 176);
+                    g.Dot(cx + x, cy + y, c);
+                }
+            g.Dot(cx, cy, Pal.White);
+        }
+        // a cape behind him: hanging, streaming back (flying) or spread wide (gliding)
+        static void DrawCape(Cells g, Look L, Species sp, double ox, double oy)
+        {
+            bool dark = L.Hero == "night";
+            int main = dark ? Pal.C(54, 54, 72) : Pal.C(204, 36, 48), hi = dark ? Pal.C(92, 94, 120) : Pal.C(236, 84, 92);
+            double sy = oy + sp.ShoulderY - 1;
+            Action<double, double, double, double> blk = (x, y, w, h) => { g.Rect(x - 1, y - 1, (int)(w + 2), (int)(h + 2), Pal.Outline); };
+            if (L.Cape == 2)
+            {
+                // spread like wings: a solid shape with a scalloped bottom edge and a few ribs
+                Func<int, int> depth = c => 10 - c / 2 - ((c % 4 == 3) ? 2 : 0);
+                for (int pass = 0; pass < 2; pass++)
+                    for (int side = -1; side <= 1; side += 2)
+                        for (int c = 0; c < 15; c++)
+                        {
+                            double x = ox + 11 + side * (5 + c), y0 = sy - 2 + c / 5;
+                            int h = Math.Max(2, depth(c));
+                            if (pass == 0) g.Rect(x - 1, y0 - 1, 3, h + 2, Pal.Outline);
+                            else g.Rect(x, y0, 1, h, c % 4 == 0 ? hi : main);
+                        }
+            }
+            else if (L.Cape == 1)
+            {
+                // streaming out behind him, rippling, thinner towards the end
+                int back = L.Face >= 0 ? -1 : 1;
+                for (int pass = 0; pass < 2; pass++)
+                    for (int c = 0; c < 20; c++)
+                    {
+                        double x = ox + 11 + back * (3 + c), wave = Math.Round(Math.Sin(c * 0.7 - L.Phase * 1.6) * 1.3);
+                        int h = Math.Max(2, 6 - c / 5);
+                        double y = sy + c * 0.15 + wave;
+                        if (pass == 0) g.Rect(x - 1, y - 1, 3, h + 2, Pal.Outline);
+                        else { g.Rect(x, y, 1, h, main); g.Dot(x, y, hi); }
+                    }
+            }
+            else
+            {
+                // hanging down his back, peeking out at the sides and below
+                int ch = (int)(16 - sp.ShoulderY);
+                blk(ox + 2, sy, 18, ch);
+                g.Rect(ox + 2, sy, 18, ch, main);
+                g.Rect(ox + 2, sy, 1, ch, hi);
             }
         }
 

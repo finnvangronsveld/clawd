@@ -34,7 +34,7 @@ Every pet can do everything below. Your choice, settings and his hunger levels a
 
 ## His menu: a hologram
 
-Right-click him and he projects a hologram above his head: his name and mood bars, a **Play** and a **Tricks** grid of buttons, then **Pocket**, **Change pet**, **Settings...** and **Bye**. It closes when you pick something, click anywhere else (him included), press Esc, switch windows, or move away.
+Right-click him and he projects a hologram above his head: his name and mood bars, **Play**, **Tricks** and **Heroes** buttons, then **Pocket**, **Change pet**, **Settings...** and **Bye**. It closes when you pick something, click anywhere else (him included), press Esc, switch windows, or move away.
 
 ## Claude Code buddy
 
@@ -54,6 +54,30 @@ Drop up to **3 files or folders** on him and he keeps them in his pocket (a 4th 
 - **x** removes it, **Empty the pocket** removes all
 
 He only remembers where the files are; nothing is moved or copied until you take it out.
+
+**Peek:** when there's something in his pocket, hold the cursor still on him for a moment and the pocket pops up by itself. Move away and it closes.
+
+## Superheroes
+
+Now and then (or from **Heroes** in his menu) he spins into a suit:
+
+- **Web-slinger:** swings across the screen on a real pendulum, webbing onto window edges, the top of the screen or your cursor. The web line wobbles and sags like a real rope.
+- **Caped flyer:** crouches, launches and flies across the screen in a big arc, cape streaming, then a super landing.
+- **Speedster:** zooms back and forth along the taskbar with a lightning trail, then skids to a stop.
+- **Night guardian:** grapples up high, perches, then glides down with his cape spread.
+- **Shield hero:** throws his shield at your cursor; it bounces off the screen edges and comes back to his hand.
+
+## Anime battle
+
+His shadow shows up. They power up (auras, sparks, the ground shakes), dash in and clash, charge up and fire beams that meet in the middle. After a beam struggle his beam wins, the shadow blows up, and he says "too easy." Pick **Anime battle!** in his menu, or wait for it.
+
+## Sandcastles
+
+Sometimes he walks to a corner of your screen and builds a sandcastle: a pile, a base, towers, a keep with a door, battlements, a flag and a shell. It stays for a few minutes, then crumbles.
+
+## Flipforward
+
+Flippy was made by [Flipforward](https://flipforward.be). Open **flipforward.be** in your browser and he gets heart eyes ("that's my creator!"); open his home, **[flippy.flipforward.be](https://flippy.flipforward.be)**, and he cheers. He stays extra happy while the site is in front.
 
 ## Playing with him
 
@@ -104,7 +128,9 @@ He has four needs: **food, energy, fun and love**. You can see them in his menu.
 - spots any window he can reach, runs over, jumps onto it and rides along when you move it
 - shoots tiny pellets at your cursor, aiming in every direction
 - pulls off trickshots: 360 no-scopes, no-look shots and ricochets
-- suits up as a web-slinger and swings across the screen, webbing onto the edges or onto your cursor
+- suits up as a superhero (see above)
+- has an anime battle with his shadow
+- builds a sandcastle in a corner
 - smashes his laptop ("fixed it.")
 
 He never steals focus from what you're doing, and he doesn't show up in the taskbar or Alt+Tab.
@@ -114,7 +140,7 @@ He never steals focus from what you're doing, and he doesn't show up in the task
 Right-click him and choose **Settings...**. From there you can:
 
 - pick your pet
-- turn individual things on or off: the gun, trickshots, the web-slinger, laptop smashing, movie night, the pause tantrum, commentary, typing along, climbing, needs, PC reactions and music
+- turn individual things on or off: the gun, trickshots, the superhero suits, anime battles, sandcastles, laptop smashing, movie night, the pause tantrum, commentary, typing along, climbing, needs, PC reactions and music
 - set his **size**, how **active** he is and how **chatty** he is
 - turn starting with Windows on or off
 - reset his needs
@@ -127,6 +153,7 @@ Everything stays on your PC:
 - **Videos:** he checks the title of the window in front to notice a video. He reads playing/paused from Windows' own media controls (the volume-key overlay).
 - **PC reactions:** battery level, CPU load and "something was copied" events. He never reads what you copied.
 - **Dropped files:** he only remembers the path (in `%APPDATA%\Flippy\pocket.txt`) and looks at the name. He never opens them.
+- **Websites:** to notice Flipforward's sites he reads the title of the browser tab in front (and which browser it is). Nothing else, nothing stored.
 - **Claude Code:** the hooks only pass on the project folder name and Claude's short status message (or the question) to him, on your PC.
 - **Menus:** while his menu is open he notices mouse clicks (only where you clicked), so it can close when you click elsewhere.
 - **Saved data:** your settings, chosen pet and his needs are stored only in `%APPDATA%\Flippy`.

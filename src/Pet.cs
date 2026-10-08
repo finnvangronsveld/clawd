@@ -18,7 +18,7 @@ namespace Flippy
         readonly Random rng = new Random();
         readonly List<Particle> parts = new List<Particle>();
         readonly Bubble bub = new Bubble();
-        readonly Settings cfg; readonly Needs needs; readonly Media media; readonly Effects fx = new Effects(); readonly PetMenu menu = new PetMenu(); readonly Pocket pocket = new Pocket();
+        readonly Settings cfg; readonly Needs needs; readonly Media media; readonly Effects fx = new Effects(); readonly PetMenu menu = new PetMenu(); readonly Pocket pocket = new Pocket(); readonly Battle battle = new Battle(); readonly Castle castle = new Castle();
         readonly List<FoodItem> foods = new List<FoodItem>();
         public Action OpenSettings, Quit;
 
@@ -26,7 +26,7 @@ namespace Flippy
         double X, Y, VX, VY, rot, spinV, sqx = 1, sqy = 1;
         int squashT, Dir = 1;
         string Mode = "walk"; int T, Timer; public int Tick;
-        bool suit, thrown;
+        bool suit, thrown; string hero = "web";
         // platform (a window he's standing on)
         IntPtr plat = IntPtr.Zero; Native.RECT platR; bool havePlatR, walkOff;
         // looks
@@ -212,11 +212,20 @@ namespace Flippy
             items.Add(new MenuItem("Coffee", () => Set("coffee")) { Group = "Play" });
             items.Add(new MenuItem("Think", () => { Set("think"); word = Pick(thinkWords); }) { Group = "Play" });
             if (cfg.Climbing) items.Add(new MenuItem("Climb", () => { if (!TryClimb()) Say("no window to climb!", 90); }) { Group = "Play" });
+            if (cfg.Sandcastles) items.Add(new MenuItem("Sandcastle", () => StartBeach()) { Group = "Play" });
             items.Add(new MenuItem("His thing!", DoSignature) { Group = "Play" });
             if (cfg.Gun) items.Add(new MenuItem("Shoot cursor", () => Set("gun")) { Group = "Tricks" });
             if (cfg.Tricks) items.Add(new MenuItem("Trickshot", () => Set("trick")) { Group = "Tricks" });
-            if (cfg.WebSwing) items.Add(new MenuItem("Web-swing", () => Set("suitup")) { Group = "Tricks" });
+            if (cfg.WebSwing)
+            {
+                items.Add(new MenuItem("Web-swing", () => StartHero("web")) { Group = "Heroes" });
+                items.Add(new MenuItem("Fly", () => StartHero("caped")) { Group = "Heroes" });
+                items.Add(new MenuItem("Speedster", () => StartHero("speed")) { Group = "Heroes" });
+                items.Add(new MenuItem("Night glide", () => StartHero("night")) { Group = "Heroes" });
+                items.Add(new MenuItem("Shield throw", () => StartHero("shield")) { Group = "Heroes" });
+            }
             if (cfg.Smash) items.Add(new MenuItem("Smash laptop", () => { parts.Clear(); Set("smash"); }) { Group = "Tricks" });
+            if (cfg.Battles) items.Add(new MenuItem("Anime battle!", () => StartBattle()) { Group = "Tricks" });
             items.Add(MenuItem.Page("Pocket", pocket.Files.Count == 0 ? "empty" : pocket.Files.Count + " / " + Pocket.Max, "pocket"));
             items.Add(MenuItem.Page("Change pet", SpeciesList.Current.ShortName, "pets"));
             items.Add(new MenuItem("Settings...", () => { if (OpenSettings != null) OpenSettings(); }));
@@ -255,7 +264,7 @@ namespace Flippy
         }
         public bool Busy;
         Point HeadPoint() { return new Point((int)X, (int)CY(Sprite.OY + SpeciesList.Current.HeadTop - 2)); }
-        void CloseMenus() { menu.Close(); ClickWatch.Disarm(); menuInit = false; }
+        void CloseMenus() { menu.Close(); ClickWatch.Disarm(); menuInit = false; peek = false; }
         // ---------- the pocket ----------
         int stashFell; bool stashTooMany;
         void PocketCopy(int i)
@@ -297,6 +306,34 @@ namespace Flippy
         string aKind, aProject, aText; double aJy, aJv;
         string AlertTag() { return "Claude" + (string.IsNullOrEmpty(aProject) ? "" : " - " + aProject); }
 
+        bool peek, peekArmed = true; int peekDwell;
+
+        // ---------- the anime battle and the sandcastle ----------
+        public void StartBattle()
+        {
+            if (suit) { suit = false; Poof(); }
+            LeavePlatform();
+            double room = 200 * K + 60 * S;
+            int side = X + room < W.Work.Right - 60 * K ? 1 : -1;
+            if (side < 0 && X - room < W.Work.Left + 60 * K) side = 1;
+            Dir = side;
+            battle.Start(X, W.Floor, side, room); battleHome = X; battleDX = 0;
+            Y = W.Floor;
+            Set("battle");
+        }
+        double beachTarget;
+        public void StartBeach()
+        {
+            if (castle.Active) castle.Hide();
+            LeavePlatform();
+            bool right = X > (W.Work.Left + W.Work.Right) / 2;
+            double edge = right ? W.Work.Right : W.Work.Left;
+            double castleX = edge - (right ? 1 : -1) * (Castle.CWd / 2 + 6) * S;
+            beachTarget = castleX - (right ? 1 : -1) * (Castle.CWd / 2 + 10) * S;
+            castle.X = castleX; castle.Y = W.Floor;
+            Set("beach");
+        }
+
         public void Poked() { CloseMenus(); if (!drag) { Set("wave"); poked = true; } }
         bool poked;
 
@@ -308,11 +345,18 @@ namespace Flippy
             if (Busy && Tick % 30 == 0) System.Threading.Thread.Sleep(400);   // test only: a stalled UI thread
             if (menuInit && !menu.Open) { ClickWatch.Disarm(); menuInit = false; }   // closed by picking an item
             if (Tick == 1 && TestX >= 0) X = TestX;
-            if (Tick == 90 && ForceMode != null) { if (ForceMode == "food") SpawnFood(false); else if (ForceMode == "menu") OpenMenu(HeadPoint()); else if (ForceMode == "picker") { OpenMenu(HeadPoint()); menu.ShowPage("pets"); } else if (ForceMode == "pocket") { OpenMenu(HeadPoint()); menu.ShowPage("pocket"); } else if (ForceMode == "switch") SwitchTo(SpeciesList.All[SpeciesList.All.IndexOf(SpeciesList.Current) == 0 ? 1 : 0]); else if (ForceMode == "signature") DoSignature(); else Set(ForceMode, 600); }
+            if (Tick == 90 && ForceMode != null) { if (ForceMode == "food") SpawnFood(false); else if (ForceMode == "menu") OpenMenu(HeadPoint()); else if (ForceMode == "picker") { OpenMenu(HeadPoint()); menu.ShowPage("pets"); } else if (ForceMode == "pocket") { OpenMenu(HeadPoint()); menu.ShowPage("pocket"); } else if (ForceMode == "switch") SwitchTo(SpeciesList.All[SpeciesList.All.IndexOf(SpeciesList.Current) == 0 ? 1 : 0]); else if (ForceMode == "signature") DoSignature(); else if (ForceMode.StartsWith("hero-")) StartHero(ForceMode.Substring(5)); else if (ForceMode == "battle") StartBattle(); else if (ForceMode == "beach") StartBeach(); else if (ForceMode == "site-home") { siteNow = "home"; } else if (ForceMode == "site-creator") { siteNow = "creator"; } else Set(ForceMode, 600); }
             if (ForceMode == "watch" || ForceMode == "paused") { videoSeen = Tick; videoRect = W.Work; }
             if (Tick % 10 == 0 || drag) W.Update(X, Y);
 
             SenseCursor();
+            // hold the cursor still on him and his pocket pops up (if there's anything in it)
+            if (!overBody) { peekArmed = true; peekDwell = 0; }
+            else if (!menu.Open && !drag && pocket.Files.Count > 0 && peekArmed && !Native.AnyMouseButtonDown())
+            {
+                peekDwell = curMoved ? Math.Max(0, peekDwell - 3) : peekDwell + 1;
+                if (peekDwell > 40) { peekArmed = false; peekDwell = 0; OpenMenu(HeadPoint()); menu.ShowPage("pocket"); peek = true; }
+            }
             L.Reset();
             if (blink > 0) blink--; else if (--nextBlink <= 0) { blink = 8; nextBlink = 160 + rng.Next(300); }
             L.Blink = blink > 0;
@@ -356,23 +400,32 @@ namespace Flippy
                            : clickedOut ? "click"     // any click that isn't on the menu (his body too)
                            : Native.EscDown() ? "esc"
                            : Native.Foreground() != menuFg ? "focus"                     // Alt+Tab / another window came to the front
-                           : menuAway > 240 ? "away" : null;                               // cursor wandered off for 4 seconds
+                           : menuAway > (peek ? 40 : 240) ? "away" : null;                               // cursor wandered off for 4 seconds
                 if (why != null) { if (Program.Verbose) Program.Log("menu closed: " + why); CloseMenus(); }
+                if (peek && menu.Page != "pocket") peek = false;      // went on to the full menu: normal rules
                 menu.Tick();
             }
             else
             {
-                if (fx != null && Mode != "swing") fx.WebOff();
-                if (suit && Mode != "suitup" && Mode != "swing" && Mode != "heropose") { suit = false; Poof(); }
+                if (fx != null && Mode != "swing" && Mode != "glide") fx.WebOff();
+                if (fx != null && Mode != "shieldthrow") fx.ShieldOff();
+                if (suit && !HeroMode(Mode)) { suit = false; Poof(); }
                 Triggers(ground);
                 Behave(ground);
+                // on Flipforward's site or his own: extra happy while it's in front
+                if (siteNow != null && (Mode == "idle" || Mode == "walk" || Mode == "chase"))
+                {
+                    L.EyeStyle = siteNow == "home" ? "happy" : "heart";
+                    if (Tick % 300 == 0) Float("heart", Sprite.OX + 6 + rng.Next(10), Sprite.OY - 1, 0, -0.15, 50, Pal.Heart);
+                }
+                if (Program.Verbose && HeroMode(Mode) && Tick % 5 == 0) Program.Log("hero " + Mode + " t" + T + " x" + (int)X + " y" + (int)Y + " rot" + (int)rot + (anchored && Mode == "swing" ? " rope" + (int)ropeL + " th" + theta.ToString("0.00") : ""));
                 // keep him on his screen
                 double minX = W.Work.Left + 7 * S, maxX = W.Work.Right - 7 * S;
                 if (X < minX) { X = minX; Dir = 1; VX = Math.Abs(VX) * (thrown ? 0.6 : 1); spinV = -spinV * 0.6; }
                 if (X > maxX) { X = maxX; Dir = -1; VX = -Math.Abs(VX) * (thrown ? 0.6 : 1); spinV = -spinV * 0.6; }
                 if (Mode != "fall" && Mode != "swing" && Mode != "trick" && Y > ground) Y = ground;
             }
-            L.Suit = suit; L.Face = Dir; if (tuftT > 0) { tuftT--; L.TuftLift = tuftT > 10 ? 2 : (tuftT > 4 ? 1 : 0); }
+            L.Suit = suit; L.Hero = hero; L.Face = Dir; if (tuftT > 0) { tuftT--; L.TuftLift = tuftT > 10 ? 2 : (tuftT > 4 ? 1 : 0); }
             if (flashT > 0) flashT--;
             if (recoilT > 0) recoilT--;
             if (L.Gun) { L.Flash = flashT > 0; L.Recoil = recoilT > 0; }
@@ -395,7 +448,9 @@ namespace Flippy
             else if (Mode == "idle" || Mode == "watch" || Mode == "sleep") ty = 1 + 0.02 * Math.Round(Math.Sin(Tick * (Mode == "sleep" ? 0.04 : 0.07)));   // breathing (in steps)
             sqx += (tx - sqx) * 0.5; sqy += (ty - sqy) * 0.5;
 
-            if (Tick % 120 == 0) { R.KeepOnTop(); foreach (FoodItem f in foods) f.KeepOnTop(); }
+            castle.Tick(S);
+            if (Mode != "battle" && battle.Active) battle.Stop();
+            if (Tick % 120 == 0) { castle.KeepOnTop(); R.KeepOnTop(); foreach (FoodItem f in foods) f.KeepOnTop(); }
         }
 
         string lastKey = ""; int lastDX, lastDY, lastDir = 1; double bobY;
@@ -446,6 +501,18 @@ namespace Flippy
                 }
             }
             videoOn = Tick - videoSeen < 120;
+            // his creator's website and his own home on the web (title of the browser tab in front, checked locally)
+            if (Tick % 30 == 10 && ForceMode != "site-home" && ForceMode != "site-creator")
+            {
+                IntPtr fg = Native.Foreground(); string site = null;
+                if (!Native.Ours(fg) && Native.IsBrowser(fg))
+                {
+                    string title = Native.Title(fg);
+                    if (title.IndexOf("Flippy", StringComparison.OrdinalIgnoreCase) >= 0 && (title.IndexOf("pixel buddy", StringComparison.OrdinalIgnoreCase) >= 0 || title.IndexOf("flippy.flipforward", StringComparison.OrdinalIgnoreCase) >= 0)) site = "home";
+                    else if (title.IndexOf("flipforward", StringComparison.OrdinalIgnoreCase) >= 0) site = "creator";
+                }
+                siteNow = site;
+            }
             if (Tick % 30 == 15)
             {
                 string v; bool m; media.Poll(out v, out m);
@@ -467,6 +534,7 @@ namespace Flippy
                 }
             }
         }
+        string siteNow, siteGreeted; int siteGreetedAt = -100000;
         bool FreeOrIdle() { return Free || Mode == "sleep" || Mode == "watch"; }
         static bool IsNight() { int h = DateTime.Now.Hour; return h >= 0 && h < 5; }
 

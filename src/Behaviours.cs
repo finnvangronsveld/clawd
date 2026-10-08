@@ -37,6 +37,9 @@ namespace Flippy
                 free = false;
             }
             if (fileHover && (free || Mode == "sleep")) { Set("sniff"); free = false; }
+            if (siteNow != null && (free || Mode == "sleep") && (siteNow != siteGreeted || Tick - siteGreetedAt > 60 * 60 * 10))
+            { siteGreeted = siteNow; siteGreetedAt = Tick; napping = false; Set("site"); free = false; }
+            if (siteNow == null && siteGreeted != null && Tick - siteGreetedAt > 60 * 60) siteGreeted = null;
             if (clipPing) { clipPing = false; if (free && cfg.PcReactions && rng.NextDouble() < 0.35 * Math.Max(0.2, cfg.Chatty)) { Set("catch"); free = false; } }
 
             // a snack nearby? go get it
@@ -94,7 +97,9 @@ namespace Flippy
             if (cfg.Smash) add("smash", 4);
             if (cfg.Gun) add("gun", 3);
             if (cfg.Tricks) add("trick", 4);
-            if (cfg.WebSwing) add("suitup", 4);
+            if (cfg.WebSwing) add("hero", 5);
+            if (cfg.Battles) add("battle", 1.5);
+            if (cfg.Sandcastles && plat == IntPtr.Zero && !castle.Active) add("beach", 2.5);
             if (cfg.Needs && needs.Energy < 30) add("nap", 14);
             add("signature", 7);
             add("walk", 45);
@@ -108,6 +113,9 @@ namespace Flippy
                 case "smash": parts.Clear(); Set("smash"); break;
                 case "nap": napping = true; Set("yawn"); break;
                 case "signature": DoSignature(); break;
+                case "hero": StartHero(Pick(Heroes)); break;
+                case "battle": StartBattle(); break;
+                case "beach": StartBeach(); break;
                 case "walk": if (rng.Next(3) == 0) Dir = -Dir; Set("walk"); break;
                 default: Set(pick); break;
             }
@@ -494,16 +502,93 @@ namespace Flippy
                         if (t % 440 == 0) Chat(Pick(sulkLines), 100);
                     }
                     break;
-                case "suitup":
+                case "suitup":       // spin, poof, and he's a hero
                     Y = ground; rot = t < 48 ? t * 7.5 : 0;
-                    if (t == 24) { Poof(); suit = true; Say("suit up!", 80); }
-                    if (t >= 60) { rot = 0; Set("swing"); }
+                    if (t == 24) { Poof(); suit = true; Say(HeroLine(hero, "up"), 80); }
+                    if (t >= 60)
+                    {
+                        rot = 0;
+                        Set(hero == "web" ? "swing" : hero == "caped" ? "fly" : hero == "speed" ? "zoom" : hero == "night" ? "glide" : "shieldthrow");
+                    }
                     break;
                 case "swing": StepSwing(ground); break;
+                case "battle":
+                    {
+                        BattlePose bp = battle.Step(battleHome + battleDX, S, K, SpeciesList.Current.ShortName);
+                        battleDX = bp.DX;
+                        Y = ground; X = battleHome + bp.DX;
+                        L.Arms = bp.Arms; L.EyeStyle = bp.Eye; L.Mouth = bp.Mouth; L.Sit = bp.Sit;
+                        if (bp.Shake > 0) shake = Math.Max(shake, bp.Shake);
+                        if (bp.Say != null) Say(bp.Say, bp.Say.Length > 12 ? 110 : 70);
+                        if (t % 30 == 0) R.KeepOnTop();
+                        if (bp.Done) { battle.Stop(); needs.Fun += 10; Set("idle", 60); }
+                        break;
+                    }
+                case "beach":
+                    {
+                        Y = ground;
+                        double d = beachTarget - X;
+                        if (Math.Abs(d) > 3 * K && t < 60 * 30)
+                        {
+                            // walk to the corner
+                            Dir = d > 0 ? 1 : -1; X += Dir * Math.Min(Math.Abs(d), 1.4 * K); L.Phase = (Tick / 8) % 4; L.Eye = Dir;
+                            if (t == 2) Chat(Pick(new[] { "beach day!", "sandcastle time", "I need a bucket..." }), 90);
+                            beachT = 0;
+                            break;
+                        }
+                        X = beachTarget; Dir = castle.X > X ? 1 : -1;
+                        beachT++;
+                        if (beachT == 1) { castle.Begin(castle.X, ground); }
+                        int stage = Math.Min(Castle.MaxStage, beachT / 150 + 1);
+                        if (beachT < Castle.MaxStage * 150)
+                        {
+                            if (stage != castle.Stage)
+                            {
+                                castle.Stage = stage;
+                                for (int i = 0; i < 6; i++) Bit(Sprite.OX + 11 + Dir * 16, Sprite.OY + 10 + rng.Next(5), (rng.NextDouble() - 0.5) * 0.6, -0.4, 26, Pal.Spark, 1, 0.03);
+                                if (stage == 3) Chat("towers!", 70); else if (stage == 4) Chat("a keep, with a door", 90); else if (stage == 5) Chat("and a flag!", 80);
+                            }
+                            L.Sit = true; L.Eye = Dir; L.EyeStyle = "down";
+                            L.Arms = (beachT / 9) % 2 == 0 ? (Dir > 0 ? "typeR" : "typeL") : "hold";
+                            if (beachT % 9 == 0) Bit(Sprite.OX + 11 + Dir * 9, Sprite.OY + 12, Dir * (0.4 + rng.NextDouble() * 0.5), -0.6 - rng.NextDouble() * 0.4, 30, Pal.C(236, 206, 140), 1, 0.05, true);
+                        }
+                        else
+                        {
+                            int a = beachT - Castle.MaxStage * 150;
+                            if (a == 1) { castle.Finish(); Say(Pick(new[] { "my masterpiece!", "a castle fit for a " + SpeciesList.Current.ShortName, "ta-da!" }), 120); needs.Fun += 8; }
+                            L.EyeStyle = "happy"; L.Mouth = "smile"; L.Arms = (a / 12) % 2 == 0 ? "up" : "wave1"; L.Eye = Dir;
+                            if (a % 40 == 1) Float("heart", Sprite.OX + 8 + rng.Next(6), Sprite.OY - 2, 0, -0.15, 50, Pal.Heart);
+                            if (a > 150) Set("idle", 90);
+                        }
+                        break;
+                    }
+                case "site":       // his creator's website, or his own home
+                    {
+                        Y = ground - siteJy;
+                        bool home = siteNow == "home" || (siteNow == null && siteGreeted == "home");
+                        if (t == 1)
+                        {
+                            Say(home ? Pick(new[] { "home sweet home!", "hey, that's my website!", "welcome to my home!" })
+                                     : Pick(new[] { "that's my creator!", "Flipforward made me!", "hi Flipforward!", "best websites in the Kempen!" }), 150);
+                            siteJv = 4.0 * K; siteJy = 0;
+                        }
+                        if (t == 60 || t == 100) { siteJv = 3.2 * K; }
+                        if (siteJy > 0 || siteJv > 0) { siteJy += siteJv; siteJv -= G; if (siteJy <= 0) { siteJy = 0; siteJv = 0; squashT = 8; } }
+                        Y = ground - siteJy;
+                        L.EyeStyle = home ? "happy" : "heart"; L.Blush = true; L.Mouth = "smile";
+                        L.Arms = siteJy > 0 ? "up" : ((t / 10) % 2 == 0 ? "wave1" : "wave2");
+                        if (t % 14 == 1) Float(home ? "star" : "heart", Sprite.OX + 4 + rng.Next(14), Sprite.OY - 1, (rng.NextDouble() - 0.5) * 0.2, -0.18, 55, home ? Pal.Spark : Pal.Heart);
+                        if (t >= 240) { siteJy = 0; needs.Love += 10; needs.Fun += 5; Set("idle", 120); }
+                        break;
+                    }
+                case "fly": StepFly(ground); break;
+                case "zoom": StepZoom(ground); break;
+                case "glide": StepGlide(ground); break;
+                case "shieldthrow": StepShield(ground); break;
                 case "heropose":
                     Y = ground; rot = 0;
-                    if (t < 100) { L.Sit = true; L.Arms = travel > 0 ? "upR" : "upL"; }
-                    if (t == 16) Chat(Pick(new[] { "nailed it.", "stuck the landing", "your friendly neighbourhood " + SpeciesList.Current.ShortName }), 110);
+                    if (t < 100) { L.Sit = true; L.Arms = travel > 0 ? "upR" : "upL"; L.ShieldHeld = hero == "shield"; }
+                    if (t == 16) Chat(HeroLine(hero, "done"), 110);
                     if (t == 140) { Poof(); suit = false; }
                     if (t >= 180) Set("idle", 60);
                     break;
@@ -621,74 +706,280 @@ namespace Flippy
         }
 
         // ---------------- web-slinging ----------------
+        double battleHome, battleDX, siteJy, siteJv; int beachT;
+
+        // ======================= superheroes =======================
+        static readonly string[] Heroes = { "web", "caped", "speed", "night", "shield" };
+        bool HeroMode(string m) { return m == "suitup" || m == "swing" || m == "heropose" || m == "fly" || m == "zoom" || m == "glide" || m == "shieldthrow"; }
+        public void StartHero(string h)
+        {
+            hero = h; if (suit) { suit = false; }
+            Set("suitup");
+        }
+        string HeroLine(string h, string when)
+        {
+            string me = SpeciesList.Current.ShortName;
+            if (when == "up")
+                switch (h)
+                {
+                    case "caped": return "to the skies!";
+                    case "speed": return "ready, set...";
+                    case "night": return "to the rooftops!";
+                    case "shield": return "shield up!";
+                    default: return "suit up!";
+                }
+            switch (h)
+            {
+                case "caped": return Pick(new[] { "all in a day's work", "the sky is my office", "super landing!" });
+                case "speed": return Pick(new[] { "did you even blink?", "too fast for you?", "speed-run complete" });
+                case "night": return Pick(new[] { "...justice.", "I work in the shadows", "the night is safe again" });
+                case "shield": return Pick(new[] { "teamwork!", "caught it!", "never miss" });
+                default: return Pick(new[] { "nailed it.", "stuck the landing", "your friendly neighbourhood " + me });
+            }
+        }
+
+        // caped flyer: crouch, launch, fly across the screen in a big arc, cape streaming, super landing
+        double fx0, fx1, fpeak;
+        void StepFly(double ground)
+        {
+            int t = T;
+            if (t == 1)
+            {
+                LeavePlatform();
+                travel = X < (W.Work.Left + W.Work.Right) / 2 ? 1 : -1; Dir = travel;
+                fx0 = X; fx1 = travel > 0 ? W.Work.Right - (W.Work.Right - W.Work.Left) * 0.12 : W.Work.Left + (W.Work.Right - W.Work.Left) * 0.12;
+                fpeak = Math.Min((ground - W.Work.Top) * 0.55, 520 * K);
+            }
+            if (t < 26) { Y = ground; L.Sit = true; L.Arms = "down"; L.EyeStyle = "down"; if (t == 25) { squashT = 10; for (int i = 0; i < 8; i++) Bit(Sprite.OX + 11 + (rng.NextDouble() - 0.5) * 20, Sprite.OY + 16, (rng.NextDouble() - 0.5) * 1.2, -0.2, 26, Pal.Steam, 2, 0.01); } return; }
+            double dur = Math.Max(110, Math.Abs(fx1 - fx0) / (8 * K));
+            double s = Math.Min(1, (t - 26) / dur);
+            double e = s < 0.5 ? 2 * s * s : 1 - 2 * (1 - s) * (1 - s);                // ease in-out along the path
+            X = fx0 + (fx1 - fx0) * e;
+            Y = ground - fpeak * Math.Sin(Math.PI * s) - Math.Sin(t * 0.12) * 4 * K * Math.Sin(Math.PI * s);
+            double lean = Math.Sin(Math.PI * s);
+            rot = travel * 28 * lean;
+            L.Cape = 1; L.Phase = (Tick / 4) % 4; L.Arms = travel > 0 ? "upR" : "upL"; L.EyeStyle = "happy"; L.Mouth = "smile";
+            if (t % 3 == 0 && lean > 0.2) Bit(Sprite.OX + 11 - travel * 10, Sprite.OY + 6 + rng.Next(6), -travel * 0.6, 0, 18, rng.Next(2) == 0 ? Pal.White : Pal.Spark, 1, 0);
+            if (t == 60) Chat(Pick(new[] { "wheeee!", "look, no strings!", "flying is the best" }), 90);
+            if (s >= 1) { Y = ground; rot = 0; squashT = 14; shake = 10; for (int i = 0; i < 10; i++) Bit(Sprite.OX + 11 + (rng.NextDouble() - 0.5) * 22, Sprite.OY + 16, (rng.NextDouble() - 0.5) * 1.4, -0.4, 30, Pal.Steam, 2, 0.02); needs.Fun += 6; Set("heropose"); }
+        }
+
+        // speedster: zooms back and forth along the floor with a lightning trail, then skids to a stop
+        int zoomPasses;
+        void StepZoom(double ground)
+        {
+            int t = T;
+            Y = ground;
+            if (t == 1) { LeavePlatform(); zoomPasses = 4 + rng.Next(3); travel = X < (W.Work.Left + W.Work.Right) / 2 ? 1 : -1; }
+            if (t < 30) { L.Sit = true; L.Arms = travel > 0 ? "upL" : "upR"; L.EyeStyle = "angry"; Dir = travel; rot = travel * 10; if (t == 20) Say("GO!", 40); return; }
+            double minX = W.Work.Left + 40 * K, maxX = W.Work.Right - 40 * K;
+            if (zoomPasses > 0)
+            {
+                X += travel * 26 * K; Dir = travel; rot = travel * 14;
+                L.Phase = (Tick / 2) % 4; L.Arms = travel > 0 ? "upL" : "upR"; L.EyeStyle = "happy";
+                // streaks and little bolts behind him
+                for (int i = 0; i < 2; i++) Bit(Sprite.OX + 11 - travel * (6 + rng.Next(10)), Sprite.OY + 3 + rng.Next(12), -travel * 0.2, 0, 14, i == 0 ? Pal.C(255, 214, 60) : Pal.C(230, 50, 50), 1.6, 0);
+                if (t % 7 == 0) Float("bolt", Sprite.OX + 11 - travel * 12, Sprite.OY + 4 + rng.Next(8), -travel * 0.1, -0.05, 16, Pal.C(255, 230, 90));
+                if ((travel > 0 && X >= maxX) || (travel < 0 && X <= minX))
+                {
+                    X = Math.Max(minX, Math.Min(maxX, X)); travel = -travel; zoomPasses--; shake = 6;
+                    for (int i = 0; i < 8; i++) Bit(Sprite.OX + 11, Sprite.OY + 16, (rng.NextDouble() - 0.5) * 1.6, -0.3 - rng.NextDouble() * 0.4, 24, Pal.Steam, 2, 0.02);
+                    if (zoomPasses == 0) { zoomStop = X + travel * 120 * K; }
+                }
+            }
+            else
+            {
+                // skid to a stop in the middle
+                double left = zoomStop - X;
+                X += Math.Sign(left) * Math.Min(Math.Abs(left), Math.Max(1.5 * K, Math.Abs(left) * 0.12));
+                L.Sit = true; rot = -travel * 12; L.Arms = "out"; L.EyeStyle = "wide";
+                if (t % 2 == 0) Bit(Sprite.OX + 11 - travel * 6, Sprite.OY + 16, -travel * 0.5, -0.2, 20, Pal.Steam, 2, 0.01);
+                if (Math.Abs(left) < 2 * K) { rot = 0; needs.Fun += 6; Set("heropose"); }
+            }
+        }
+        double zoomStop;
+
+        // night guardian: grapple up high, perch, then glide down with his cape spread
+        double gTop, gAnchor;
+        void StepGlide(double ground)
+        {
+            int t = T;
+            if (t == 1)
+            {
+                LeavePlatform();
+                travel = X < (W.Work.Left + W.Work.Right) / 2 ? 1 : -1; Dir = travel;
+                gTop = Math.Max(W.Work.Top + 70 * K, ground - 560 * K); gAnchor = Math.Max(W.Work.Top + 4, gTop - 70 * K);
+                fy0 = Y;
+            }
+            if (t < 50)
+            {
+                // the grapple: shoot up, then get pulled up
+                double s = t < 14 ? 0 : (t - 14) / 36.0; s = 1 - (1 - s) * (1 - s);
+                Y = fy0 + (gTop - fy0) * s;
+                L.Arms = "up"; L.EyeStyle = "up";
+                webPhase += 0.5;
+                fx.Web(X, Y - 15 * S, X, gAnchor, S, t < 20 ? 9 * K : 9 * K * Math.Exp(-(t - 20) / 8.0), 0, webPhase, Math.Min(1, t / 14.0));
+                return;
+            }
+            fx.WebOff();
+            if (t < 100) { Y = gTop; L.Sit = true; L.Arms = "out"; L.EyeStyle = (t / 30) % 2 == 0 ? "normal" : "down"; L.Eye = travel; if (t == 60) Chat("the city sleeps...", 80); return; }
+            if (t == 100) { VY = -2.4 * K; VX = travel * 3.6 * K; }
+            // gliding: drag keeps the fall slow, a gentle sway
+            VY = Math.Min(VY + G * 0.6, 1.5 * K + Math.Sin(t * 0.08) * 0.4 * K);
+            X += VX; Y += VY;
+            if (X < W.Work.Left + 40 * K || X > W.Work.Right - 40 * K) { VX = -VX; travel = -travel; Dir = travel; }
+            rot = travel * 8 + Math.Sin(t * 0.08) * 6;
+            L.Cape = 2; L.Arms = "up"; L.EyeStyle = "normal";
+            if (Y >= ground) { Y = ground; rot = 0; squashT = 12; needs.Fun += 6; Set("heropose"); }
+        }
+        double fy0;
+
+        // shield hero: throws his shield at your cursor, it bounces off the screen edges and comes back
+        double shX, shY, shVX, shVY, shSpin; int shBounces; bool shBack;
+        void StepShield(double ground)
+        {
+            int t = T;
+            Y = ground; Dir = cur.X >= X ? 1 : -1;
+            if (t == 1) LeavePlatform();
+            if (t < 34) { L.ShieldHeld = true; L.Arms = Dir > 0 ? "upR" : "upL"; L.EyeStyle = "angry"; rot = -Dir * Math.Min(12, t * 0.6); if (t == 8) Chat("catch!", 50); return; }
+            if (t == 34)
+            {
+                rot = Dir * 10;
+                shX = X + Dir * 12 * S; shY = Y - 9 * S; shBounces = 0; shBack = false;
+                double dx = cur.X - shX, dy = cur.Y - shY, d = Math.Max(1, Math.Sqrt(dx * dx + dy * dy));
+                shVX = dx / d * 15 * K; shVY = dy / d * 15 * K;
+            }
+            rot *= 0.85;
+            double hx = X + Dir * 10 * S, hy = Y - 9 * S;
+            if (!shBack)
+            {
+                shX += shVX; shY += shVY;
+                if (shX < W.Work.Left + 6 * S) { shX = W.Work.Left + 6 * S; shVX = Math.Abs(shVX); shBounces++; Clang(); }
+                if (shX > W.Work.Right - 6 * S) { shX = W.Work.Right - 6 * S; shVX = -Math.Abs(shVX); shBounces++; Clang(); }
+                if (shY < W.Work.Top + 6 * S) { shY = W.Work.Top + 6 * S; shVY = Math.Abs(shVY); shBounces++; Clang(); }
+                if (shY > W.Work.Bottom - 6 * S) { shY = W.Work.Bottom - 6 * S; shVY = -Math.Abs(shVY); shBounces++; Clang(); }
+                double cdx2 = cur.X - shX, cdy2 = cur.Y - shY;
+                if (cdx2 * cdx2 + cdy2 * cdy2 < 30 * K * 30 * K && t > 40 && !shHit) { shHit = true; Chat("got you!", 60); }
+                if (shBounces >= 3 || t > 34 + 240) shBack = true;
+            }
+            else
+            {
+                // homing back to his hand
+                double dx = hx - shX, dy = hy - shY, d = Math.Max(1, Math.Sqrt(dx * dx + dy * dy));
+                shVX += (dx / d * 17 * K - shVX) * 0.12; shVY += (dy / d * 17 * K - shVY) * 0.12;
+                shX += shVX; shY += shVY;
+                if (d < 16 * K)
+                {
+                    fx.ShieldOff(); squashT = 8; L.ShieldHeld = true; shake = 4;
+                    Say("*clang*", 50); needs.Fun += 5; Set("heropose"); return;
+                }
+            }
+            shSpin += 24;
+            fx.Shield(shX, shY, S, shSpin);
+            L.Arms = shBack ? (Dir > 0 ? "upR" : "upL") : "out";
+        }
+        bool shHit;
+        void Clang() { shake = 3; }
+
+        // ---------------- web-swinging: a real pendulum ----------------
+        // The rope hangs from an anchor (a window's top edge, the top of the screen, or your cursor). While he
+        // hangs on it, his angle and angular speed follow pendulum physics (gravity pulls him back to the bottom,
+        // he pumps a little to keep the swing going); he lets go on the upswing with exactly the speed of the
+        // swing, flies through the air, and shoots the next web near the top of that flight.
+        double theta, omega;
         void NewAnchor()
         {
             double px = X, py = Y - 8 * S;
+            double reach = 520 * K, ideal = 300 * K;
+            anchorCursor = false;
             double cdx2 = cur.X - px;
-            if (cur.Y < py - 120 * K && cur.Y > W.Work.Top && Math.Abs(cdx2) < 700 * K && cdx2 * travel > -150 * K && rng.Next(2) == 0)
+            // 1. your cursor, if it's above him and a bit ahead
+            if (cur.Y < py - 140 * K && cur.Y > W.Work.Top && Math.Abs(cdx2) < 420 * K && cdx2 * travel > -60 * K && rng.Next(3) == 0)
             {
                 anchorCursor = true; ax = cur.X; ay = cur.Y;
                 if (rng.Next(2) == 0) Chat("thanks for the hand!", 80);
             }
             else
             {
-                anchorCursor = false;
-                double wallX = travel > 0 ? W.Work.Right - 2 : W.Work.Left + 2;
-                if (Math.Abs(wallX - px) < 380 * K) { ax = wallX; ay = Math.Max(W.Work.Top + 20, py - 280 * K); travel = -travel; }
-                else { ax = Math.Max(W.Work.Left + 20, Math.Min(W.Work.Right - 20, px + travel * (240 + rng.Next(220)) * K)); ay = W.Work.Top + 2; }
+                // 2. the top edge of a window above and ahead, 3. the top of the screen, 4. high up ahead
+                double tx = Math.Max(W.Work.Left + 30 * K, Math.Min(W.Work.Right - 30 * K, px + travel * (140 + rng.Next(160)) * K));
+                IntPtr h = Native.FindTop((int)tx, 4, (int)(py - reach), (int)(py - 140 * K));
+                if (h != IntPtr.Zero) { ax = tx; ay = Native.Rect(h).Top; }
+                else if (py - W.Work.Top < reach) { ax = tx; ay = W.Work.Top + 2; }
+                else { ax = tx; ay = py - ideal; }
             }
             double dx = px - ax, dy = py - ay;
-            ropeL = Math.Sqrt(dx * dx + dy * dy); ropeTarget = Math.Min(ropeL * 0.85, 420 * K); anchT = 0; anchored = true;
+            ropeL = Math.Max(80 * K, Math.Sqrt(dx * dx + dy * dy));
+            ropeTarget = Math.Min(ropeL, Math.Max(150 * K, ropeL * 0.8));     // reel in a little, smoothly
+            theta = Math.Atan2(dx, dy);                                         // 0 = straight below the anchor
+            // keep his momentum: only the speed across the rope survives
+            double vt = VX * Math.Cos(theta) - VY * Math.Sin(theta);
+            omega = vt / ropeL;
+            anchT = 0; anchored = true; webWob = 13 * K;
         }
+        double webWob, webPhase;
         void StepSwing(double ground)
         {
             int t = T;
-            // physics on his middle point
             double px = X, py = Y - 8 * S;
             if (t == 1)
             {
-                LeavePlatform(); VX = 0; VY = 0; swings = 0; maxSwings = 4 + rng.Next(4); flip = 0;
-                travel = X < (W.Work.Left + W.Work.Right) / 2 ? 1 : -1; anchored = false; freeT = 99;
+                LeavePlatform(); swings = 0; maxSwings = 4 + rng.Next(4); flip = 0;
+                travel = X < (W.Work.Left + W.Work.Right) / 2 ? 1 : -1; anchored = false;
+                VX = travel * 2.2 * K; VY = -7.5 * K; freeT = 0;      // a jump to start
                 Say("THWIP!", 70);
             }
-            if (!anchored && swings < maxSwings && freeT >= 12 && VY >= -1 * K) NewAnchor();
             freeT++;
-            VY += G;
-            if (anchored && anchorCursor) { ax = cur.X; ay = cur.Y; }
-            px += VX; py += VY;
+            if (!anchored && swings < maxSwings && freeT > 8 && VY > -1.2 * K && py > W.Work.Top + 160 * K) NewAnchor();
+
             if (anchored)
             {
-                ropeL = Math.Max(ropeTarget, ropeL - 11 * K);
-                double dx = px - ax, dy = py - ay, d = Math.Sqrt(dx * dx + dy * dy);
-                if (d > ropeL && d > 0)
-                {
-                    double nx = dx / d, ny = dy / d;
-                    px = ax + nx * ropeL; py = ay + ny * ropeL;
-                    double vr = VX * nx + VY * ny;
-                    if (vr > 0) { VX -= vr * nx; VY -= vr * ny; }
-                }
+                if (anchorCursor) { ax = cur.X; ay = cur.Y; }
+                // reel in smoothly; a shorter rope spins faster (angular momentum is kept)
+                if (ropeL > ropeTarget) { double nl = Math.Max(ropeTarget, ropeL - 1.2 * K); omega *= (ropeL * ropeL) / (nl * nl); ropeL = nl; }
+                double g = 0.21 * K;
+                omega += -(g / ropeL) * Math.Sin(theta);
+                // pump: a little push in his travel direction while passing the bottom
+                if (Math.Abs(theta) < 0.35 && omega * travel > 0) omega += travel * 0.0009;
+                omega *= 0.998;
+                if (Math.Sign(omega) != Math.Sign(omega - (-(g / ropeL) * Math.Sin(theta))) || Math.Abs(omega) < 0.002) webWob = Math.Max(webWob, 4 * K);   // the turn: a little twang
+                omega = Math.Max(-0.09, Math.Min(0.09, omega));
+                theta += omega;
+                theta = Math.Max(-1.45, Math.Min(1.45, theta));
+                px = ax + Math.Sin(theta) * ropeL; py = ay + Math.Cos(theta) * ropeL;
+                VX = omega * ropeL * Math.Cos(theta); VY = -omega * ropeL * Math.Sin(theta);
                 anchT++;
-                bool forward = (px - ax) * travel > 0;
-                if ((anchT > 36 && VX * travel > 1 * K && VY < 0 && forward) || anchT > 280)
+                // let go on the upswing, ahead of the anchor, while still moving forward and up
+                bool upswing = omega * travel > 0 && theta * travel > 0.45;
+                if ((upswing && anchT > 30) || anchT > 300 || (theta * travel > 1.2))
                 {
-                    anchored = false; freeT = 0; swings++; VX *= 1.1; VY -= 1.5 * K;
+                    anchored = false; freeT = 0; swings++;
                     if (rng.Next(3) == 0) flip = 36;
                     if (rng.Next(3) == 0) Chat(Pick(new[] { "thwip!", "wheee!", "whoo!", "parkour!" }), 70);
                 }
             }
-            if (px < W.Work.Left + 40 * K) { px = W.Work.Left + 40 * K; VX = Math.Abs(VX) * 0.4; travel = 1; }
-            if (px > W.Work.Right - 40 * K) { px = W.Work.Right - 40 * K; VX = -Math.Abs(VX) * 0.4; travel = -1; }
-            if (py < W.Work.Top + 60 * K) { py = W.Work.Top + 60 * K; VY = Math.Abs(VY) * 0.3; }
+            else
+            {
+                VY = Math.Min(VY + G, 16 * K); VX *= 0.997;
+                px += VX; py += VY;
+            }
+            // walls: bounce off and head the other way
+            if (px < W.Work.Left + 40 * K) { px = W.Work.Left + 40 * K; VX = Math.Abs(VX) * 0.5; travel = 1; if (anchored) { anchored = false; freeT = 0; } }
+            if (px > W.Work.Right - 40 * K) { px = W.Work.Right - 40 * K; VX = -Math.Abs(VX) * 0.5; travel = -1; if (anchored) { anchored = false; freeT = 0; } }
+            if (py < W.Work.Top + 50 * K) { py = W.Work.Top + 50 * K; VY = Math.Abs(VY) * 0.3; }
 
-            if (anchored) rot = Math.Atan2(py - ay, px - ax) * 180 / Math.PI - 90;
+            Dir = VX >= 0 ? 1 : -1;
+            if (anchored) rot = -theta * 180 / Math.PI;
             else if (flip > 0) { rot = (36 - flip) * 10 * travel; flip--; }
-            else rot = Math.Max(-35, Math.Min(35, VX * 3));
+            else rot = Math.Max(-30, Math.Min(30, VX * 2.5 / Math.Max(1, K)));
             L.Arms = "up";
-
             if (anchored)
             {
                 double a = rot * Math.PI / 180;
-                fx.Web(px + Math.Sin(a) * 11 * S, py - Math.Cos(a) * 11 * S, ax, ay, S);
+                webWob *= 0.93; webPhase += 0.55;
+                double reach = Math.Min(1, (anchT + 1) / 6.0);                       // the shot: it unrolls first
+                double sag = anchorCursor ? 10 * K : 0;
+                fx.Web(px + Math.Sin(a) * 11 * S, py - Math.Cos(a) * 11 * S, ax, ay, S, webWob, sag, webPhase, reach);
             }
             else fx.WebOff();
 

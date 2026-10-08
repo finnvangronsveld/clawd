@@ -145,6 +145,22 @@ namespace Flippy
 
         // ---- windows ----
         public static IntPtr Foreground() { return GetForegroundWindow(); }
+        static readonly Dictionary<uint, string> procNames = new Dictionary<uint, string>();
+        // the exe name (lower case, no .exe) of the app that owns a window; cached per process
+        public static string ProcessName(IntPtr h)
+        {
+            uint pid; GetWindowThreadProcessId(h, out pid);
+            string n;
+            if (procNames.TryGetValue(pid, out n)) return n;
+            try { n = System.Diagnostics.Process.GetProcessById((int)pid).ProcessName.ToLowerInvariant(); } catch { n = ""; }
+            if (procNames.Count > 200) procNames.Clear();
+            procNames[pid] = n; return n;
+        }
+        public static bool IsBrowser(IntPtr h)
+        {
+            switch (ProcessName(h)) { case "chrome": case "msedge": case "firefox": case "brave": case "opera": case "opera_gx": case "vivaldi": case "arc": case "librewolf": case "waterfox": case "zen": case "iexplore": return true; }
+            return false;
+        }
         public static string Title(IntPtr h) { StringBuilder sb = new StringBuilder(512); GetWindowText(h, sb, 512); return sb.ToString(); }
         static RECT R(IntPtr h)
         {

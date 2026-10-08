@@ -103,21 +103,63 @@ namespace Flippy
         }
 
         // ---- web line ----
-        public void Web(double x1, double y1, double x2, double y2, int S)
+        // The line isn't a metal rod: it can wobble (a standing wave that travels along it), sag, and while
+        // it's being shot it only reaches part of the way (reach 0..1).
+        public void Web(double x1, double y1, double x2, double y2, int S) { Web(x1, y1, x2, y2, S, 0, 0, 0, 1); }
+        public void Web(double x1, double y1, double x2, double y2, int S, double wobble, double sag, double phase, double reach)
         {
-            int pad = 6 * S;
-            int wx = (int)Math.Min(x1, x2) - pad, wy = (int)Math.Min(y1, y2) - pad;
-            web.Surf.Ensure((int)Math.Abs(x2 - x1) + 2 * pad, (int)Math.Abs(y2 - y1) + 2 * pad); web.Surf.Clear();
-            Graphics g = web.Surf.G; g.TranslateTransform(-wx, -wy); g.SmoothingMode = SmoothingMode.AntiAlias;
             float k = S / 3f;
-            using (Pen o = new Pen(Color.FromArgb(110, 60, 60, 80), 3.2f * k)) g.DrawLine(o, (float)x1, (float)y1, (float)x2, (float)y2);
-            using (Pen w = new Pen(Color.FromArgb(245, 250, 250, 255), 1.6f * k)) g.DrawLine(w, (float)x1, (float)y1, (float)x2, (float)y2);
-            // splat where it sticks
-            using (Pen w = new Pen(Color.FromArgb(230, 250, 250, 255), 1.2f * k))
-                for (int i = 0; i < 6; i++) { double a = i * Math.PI / 3 + 0.3; g.DrawLine(w, (float)x2, (float)y2, (float)(x2 + Math.Cos(a) * 5 * k), (float)(y2 + Math.Sin(a) * 5 * k)); }
+            const int N = 28;
+            double dx = x2 - x1, dy = y2 - y1, len = Math.Max(1, Math.Sqrt(dx * dx + dy * dy));
+            double nx = -dy / len, ny = dx / len;
+            if (ny < 0) { nx = -nx; ny = -ny; }              // sag points down
+            PointF[] pts = new PointF[N + 1];
+            double minx = double.MaxValue, miny = double.MaxValue, maxx = double.MinValue, maxy = double.MinValue;
+            for (int i = 0; i <= N; i++)
+            {
+                double u = (double)i / N * reach;
+                double env = Math.Sin(Math.PI * u / Math.Max(0.001, reach));
+                double off = sag * env + wobble * env * Math.Sin(u * Math.PI * 3 + phase) + (reach < 1 ? wobble * 0.6 * Math.Sin(u * 18 + phase * 2) * (u / reach) : 0);
+                double px = x1 + dx * u + nx * off, py = y1 + dy * u + ny * off;
+                pts[i] = new PointF((float)px, (float)py);
+                minx = Math.Min(minx, px); miny = Math.Min(miny, py); maxx = Math.Max(maxx, px); maxy = Math.Max(maxy, py);
+            }
+            int pad = 8 * S;
+            int wx = (int)minx - pad, wy = (int)miny - pad;
+            web.Surf.Ensure((int)(maxx - minx) + 2 * pad, (int)(maxy - miny) + 2 * pad); web.Surf.Clear();
+            Graphics g = web.Surf.G; g.TranslateTransform(-wx, -wy); g.SmoothingMode = SmoothingMode.AntiAlias;
+            using (Pen o = new Pen(Color.FromArgb(110, 60, 60, 80), 3.2f * k)) { o.LineJoin = LineJoin.Round; g.DrawLines(o, pts); }
+            using (Pen w = new Pen(Color.FromArgb(245, 250, 250, 255), 1.6f * k)) { w.LineJoin = LineJoin.Round; g.DrawLines(w, pts); }
+            PointF end = pts[N];
+            if (reach >= 1)
+                using (Pen w = new Pen(Color.FromArgb(230, 250, 250, 255), 1.2f * k))     // splat where it sticks
+                    for (int i = 0; i < 6; i++) { double a = i * Math.PI / 3 + 0.3; g.DrawLine(w, end.X, end.Y, (float)(end.X + Math.Cos(a) * 5 * k), (float)(end.Y + Math.Sin(a) * 5 * k)); }
             web.Present(wx, wy); web.KeepOnTop();
             webOn = true;
         }
         public void WebOff() { if (webOn) { web.Hide(); webOn = false; } }
+
+        // ---- the shield hero's thrown shield (spinning, with a little motion blur) ----
+        readonly LayeredWindow shield = new LayeredWindow(true);
+        readonly Cells shieldCells = new Cells(11, 11);
+        bool shieldOn;
+        public void Shield(double x, double y, int S, double spin)
+        {
+            shieldCells.Clear(); Sprite.DrawShield(shieldCells, 5, 5);
+            int size = 11 * S, pad = 4 * S;
+            shield.Surf.Ensure(size + 2 * pad, size + 2 * pad); shield.Surf.Clear();
+            Graphics g = shield.Surf.G;
+            g.InterpolationMode = InterpolationMode.NearestNeighbor; g.PixelOffsetMode = PixelOffsetMode.Half;
+            float c = size / 2f + pad;
+            // a squashed ellipse that "spins" (the shield turning on its edge)
+            float sx = (float)Math.Max(0.25, Math.Abs(Math.Cos(spin * Math.PI / 180)));
+            using (SolidBrush gl = new SolidBrush(Color.FromArgb(50, 255, 255, 255))) g.FillEllipse(gl, c - size * 0.62f, c - size * 0.62f, size * 1.24f, size * 1.24f);
+            g.TranslateTransform(c, c); g.ScaleTransform(sx, 1);
+            g.DrawImage(shieldCells.ToBitmap(), new RectangleF(-size / 2f, -size / 2f, size, size), new RectangleF(0, 0, 11, 11), GraphicsUnit.Pixel);
+            g.ResetTransform();
+            shield.Present((int)(x - c), (int)(y - c)); shield.KeepOnTop();
+            shieldOn = true;
+        }
+        public void ShieldOff() { if (shieldOn) { shield.Hide(); shieldOn = false; } }
     }
 }

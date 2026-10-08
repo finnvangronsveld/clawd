@@ -19,7 +19,7 @@ Starting `Flippy.exe` (without `--test`) points the shortcuts at whichever exe w
 ## For the website (current facts)
 
 - **Name:** Flippy, after the owner's brand Flipforward. Tagline: "A little pixel buddy who lives on your Windows desktop."
-- **Latest version:** 2.5 (`Program.Version`). Releases: https://github.com/finnvangronsveld/flippy/releases
+- **Latest version:** 2.6 (`Program.Version`). Releases: https://github.com/finnvangronsveld/flippy/releases
 - **Download (always the latest):** https://github.com/finnvangronsveld/flippy/releases/latest/download/Flippy.zip
   - Unzip it and double-click `Install Flippy.cmd`.
   - Needs Windows 10 or 11. No admin rights, nothing else to install.
@@ -48,7 +48,8 @@ Starting `Flippy.exe` (without `--test`) points the shortcuts at whichever exe w
     - drag and throw him (physics, spins, bounces, lands dizzy)
     - he hops when clicked, gets dizzy after 4 quick clicks, and blushes when you rub him
   - **Claude Code buddy:** he tells you when Claude Code is done (hops and waves, with the project name) or has a question / needs your OK (jumps with a red "!" until you click him or start typing). One click in Settings connects it (Claude Code hooks). Terminal and the desktop app's Code tab.
-  - **Pocket:** drop up to 3 files or folders on him; take them back from his menu (click = copy, then paste anywhere; or drag them out).
+  - **Pocket:** drop up to 3 files or folders on him; take them back from his menu (click = copy, then paste anywhere; or drag them out). Hold the cursor still on him and the pocket pops up.
+  - **Flipforward:** on flipforward.be he gets heart eyes ("that's my creator!"); on flippy.flipforward.be (his home) he cheers; he stays happy while the site is in front.
   - **Food and files:**
     - feed him snacks: a cookie, pizza, apple or donut
     - drop a file on him and he has an opinion, then pockets it
@@ -59,7 +60,9 @@ Starting `Flippy.exe` (without `--test`) points the shortcuts at whichever exe w
   - **On his own:**
     - chases the cursor, dances, takes coffee breaks
     - aims a pellet gun at your cursor and does trickshots (360 no-scope, ricochets)
-    - swings across the screen in his web-slinger suit
+    - superheroes (generic, no real characters): web-slinger (pendulum swinging, a rope-like web line), caped flyer (flies across the screen), speedster (zooms with a lightning trail), night guardian (grapples up, glides down), shield hero (throws a bouncing shield)
+    - an anime battle with his shadow clone: auras, a dash and clash, a beam struggle he wins
+    - builds a sandcastle in a corner (six stages; it crumbles after a few minutes)
     - smashes his laptop, or does his signature move
   - **Menus:**
     - a hologram right-click menu: he projects it above his head (beam, glow, scanlines, flickers on). Name and mood bars, Play and Tricks button grids, then Pocket, Change pet (live previews), Settings, Bye
@@ -68,6 +71,7 @@ Starting `Flippy.exe` (without `--test`) points the shortcuts at whichever exe w
 - **Privacy:** everything stays on the PC. Nothing is sent anywhere, and data lives in `%APPDATA%\Flippy`.
   - **Typing:** counts key presses, never which keys.
   - **Videos:** reads the title of the window in front and Windows' media play/pause state.
+  - **Websites:** reads the browser tab title in front (and the browser's process name) only to spot flipforward.be and flippy.flipforward.be.
   - **PC reactions:** battery, CPU and "something was copied" events, never the copied contents.
   - **Dropped files:** looks only at the file name.
   - **Menus:** while a menu is open, it notices mouse clicks (only where they happen) so it knows when to close.
@@ -75,6 +79,7 @@ Starting `Flippy.exe` (without `--test`) points the shortcuts at whichever exe w
   - **Claude Code:** the hooks pass only the project folder name and Claude's short status message or question to the pet, locally.
 - **Open source:** C#, built with the compiler that ships with Windows. Public repo above.
 - **Changelog:**
+  - **2.6:** five superheroes (web-slinger with real pendulum physics and a wobbly web line, caped flyer, speedster, night guardian, shield hero), the anime battle, sandcastles, Flipforward website reactions, and the pocket pops up when you hover him.
   - **2.5:** Claude Code buddy (tells you when Claude is done or has a question), a pocket for 3 files, the hologram menu, and animation polish: walking feet really step, a bounce on every step, a squash when he turns, and Flip's mouth expressions now read clearly.
   - **2.4:** New right-click menu: a proper panel at the cursor instead of the thought cloud; "Change pet" is a page inside it. Closing on an outside click now really works (the click watcher runs on its own thread).
   - **2.3:** The menus (the right-click cloud and "Change pet...") now close reliably on a click outside them, on Esc, when you switch windows, or after 4 s with the cursor away.
@@ -95,11 +100,13 @@ Starting `Flippy.exe` (without `--test`) points the shortcuts at whichever exe w
 | `src/SpeciesTemplate.cs` | `TemplateSpecies`: a pet drawn from a hand-authored pixel template. Outline and edge light/shade are added automatically; arms, feet and the face (big or bead eyes) are procedural at anchor points; the back view is derived. Use this for new pets. |
 | `src/SpeciesFlipPets.cs` | Flip (default), Hopper and Flapjack, as templates. |
 | `src/SpeciesClassic.cs` | The classic orange pet. Deleting this file and its entry in `SpeciesList.All` removes him. |
-| `src/Art.cs` | `Pal`, `Cells` (the pixel canvas), `Glyphs`, `Look` (this frame's pose), and `Sprite`. `Sprite` holds the shared props (headphones, nightcap, mug, snacks, laptop, the "!"), the species-agnostic web-slinger suit, the popcorn bucket, the gun bitmaps and `IconArt`. |
+| `src/Art.cs` | `Pal`, `Cells` (the pixel canvas), `Glyphs`, `Look` (this frame's pose), and `Sprite`. `Sprite` holds the shared props (headphones, nightcap, mug, snacks, laptop, the "!"), the species-agnostic superhero suits (`L.Suit` + `L.Hero`: web via `DrawSuit`, caped/speed/night/shield via `DrawHero` recolouring + emblems; capes behind the body via `DrawCape`, `L.Cape` 0 hanging / 1 streaming / 2 spread; `DrawShield`), the popcorn bucket, the gun bitmaps and `IconArt`. |
 | `src/Render.cs` | `Renderer`: cells → screen. **Body** window (the pet plus the gun; the only window that takes clicks) and **Fx** window (click-through: shadow, movie-night glow, particles, bubble). Squash/stretch and rotation. |
 | `src/Pet.cs` + `src/Behaviours.cs` | `partial class Pet`: body, senses, mouse, menu (`OpenMenu`), `SwitchTo`, `Triggers`, `PickActivity`, and the mode switch (`Behave`). |
 | `src/Pocket.cs` | The pocket: up to 3 paths in `%APPDATA%\Flippy\pocket.txt` (newest last; a 4th drops the oldest). |
 | `src/ClaudeHooks.cs` | Claude Code alerts. `Notify` = the `--notify <stop|notification|question>` side (reads the hook JSON from the **raw stdin handle**; a GUI exe has no Console streams), writes a line to `claude-inbox.txt` and sets `Local\FlippyNotify`. `TakeInbox` = the running pet's side. `Connect`/`Disconnect` edit `~/.claude/settings.json` (backup `.flippy-backup`, pretty-printed, other hooks untouched; ours are recognised by `<exe> --notify <event>`). |
+| `src/Battle.cs` | The anime battle: `Battle.Step` runs the script (appear, power-up, dash + clash, charge, beam struggle, explosion, victory) and returns a `BattlePose` for the pet; the shadow clone, auras, beams and sparks are drawn in one click-through window behind him. |
+| `src/Castle.cs` | The sandcastle: pixel art in 6 stages in its own click-through window; `Finish()` keeps it 3 minutes, then it crumbles. |
 | `src/Menu.cs` | `PetMenu` + `MenuItem`: the **hologram** right-click menu. **One** layered window, projected above his head (`Pet.HeadPoint()`): a beam from his head, glow, scanlines, corner brackets; it flickers on over ~14 ticks (`openT`; rows are laid out even while hidden). Main page: name, tagline, mood bars, button grids per `MenuItem.Group` ("Play", "Tricks"), then rows. `MenuItem.Page(text, hint, target)` opens a page in the same window: `"pets"` (Change pet) and `"pocket"` (click = copy, drag = `DoDragDrop` out, x = remove). An item runs on mouse-up over the same row it went down on; the menu hides first. |
 | `src/Settings.cs` | `Store` (key=value files in `%APPDATA%\Flippy`), `Settings` (toggles, sliders, `Pet=<id>`, and the settings form with its Pet section), and `Needs`. |
 | `src/Migration.cs` | The **only** code that knows the old name. It copies settings and needs from the old folder once, stops an old running instance, and replaces old shortcuts. |
@@ -137,6 +144,9 @@ Starting `Flippy.exe` (without `--test`) points the shortcuts at whichever exe w
   - Right-click on the pet toggles: the press closes the menu, and the release doesn't reopen it (`ClosedAtMs`).
   - Don't go back to the "pressed since last call" bit of `GetAsyncKeyState`. It's shared system-wide and misses clicks.
   - `--verbose` logs "menu opened rows: i@x,y ...", "menu: pets page rows: ...", "outside click (hook|poll) at x,y" and "menu closed: click|esc|focus|away".
+- **Superheroes:** `StartHero(id)` -> `suitup` -> `swing` / `fly` / `zoom` / `glide` / `shieldthrow` -> `heropose`. `HeroMode()` lists the modes that keep the suit on. Swinging is a pendulum in angle space (`theta`, `omega`, rope length `ropeL`, gravity `0.21*K`): attaching converts his velocity to `omega`, reeling in keeps angular momentum, he lets go on the upswing with the swing's own velocity. Anchors: your cursor, a window top (`Native.FindTop`), the top of the screen, else a point in the air ahead. `fx.Web(..., wobble, sag, phase, reach)` draws the line as a wobbly curve that unrolls when shot.
+- **Battle / sandcastle / sites:** `StartBattle()`, `StartBeach()` (walks to the nearer bottom corner first). Sites: every 30 ticks, if the foreground window is a browser (`Native.IsBrowser`, by process name) its title is matched ("Flippy" + "pixel buddy" = home, "flipforward" = creator) -> mode `site` once per visit (again after 10 min).
+- **Pocket peek:** cursor still on him for 40 ticks with files in the pocket -> the menu opens on the pocket page with `peek = true` (closes after 40 ticks away instead of 240; going "<" to the main menu ends the peek).
 - **Template pets:** a stepping foot (`L.Phase` 1 or 3) is lifted one cell and moved forward (`L.Face`). `MouthRows = 2` for small faces (Flip's LCD) keeps every mouth inside two rows. Walking/chasing also bobs the whole sprite one cell per step (`bobY` in `Pet`, kept out of the shadow).
 - **Species:** behaviours never draw pet-specific pixels. Props are placed with the species' anchors (`MugSipX`, `HeldY`, `BangY`, `MaskLX`...).
 
@@ -156,6 +166,7 @@ Starting `Flippy.exe` (without `--test`) points the shortcuts at whichever exe w
 - **Test switches:** `bin\Dev.exe --test --verbose [--pet <id>] [--mode <mode>] [--x <screenX>] [--data <dir>] [--old-data <dir>] [--busy]`.
   - `--test` uses its own mutex and poke event, and a **temp data folder** (`%TEMP%\FlippyTestData`, or `--data`). It never touches the real `%APPDATA%\Flippy`, and it skips the real migration and shortcut handling.
   - `--mode` takes any mode name, or `food`, `menu`, `picker`, `switch`, `signature`, `watch` or `paused`.
+  - **New modes:** `--mode hero-web|hero-caped|hero-speed|hero-night|hero-shield`, `battle`, `beach`, `site-home`, `site-creator`. With `--verbose`, hero modes log `hero <mode> t x y rot` every 5 ticks (check for jumps).
   - **Claude alerts:** start a test pet, then pipe a hook JSON **file** into `bin\Dev.exe --notify stop|notification|question --test` (Git Bash `echo` mangles backslashes, so write the JSON with Python). `--claude-hooks on|off` connects/disconnects; set `FLIPPY_CLAUDE_SETTINGS=<copy of settings.json>` to test on a copy, never on the real file.
   - **Pocket:** `--mode pocket` opens the pocket page; seed `<data>\pocket.txt`. Drag tests need the drag source in **another process** (a drag is a modal loop) and real `mouse_event` moves; Explorer is the trustworthy drop target.
   - **Menu closing:** open a menu with `--mode menu` or `picker` (add `--busy` to stall the UI thread 400 ms every half second). Click a dummy window that's already in front, the pet, an item, and "Change pet" → a pet (row centres are in the log), and check the log and that no menu window is left visible. Send the synthetic clicks from a **DPI-aware** process, or the coordinates are off. Pass `--pet` so the test data's saved pet doesn't skew the switch test. The owner may be using the mouse during tests: a stray "outside click" at a point you didn't click is him.
@@ -197,7 +208,7 @@ Old git history keeps the old name, and that's fine.
   - The pocket never opens, moves or copies a file by itself; only the user taking it out does.
   - Claude Code hooks pass only the project folder name and Claude's short status message or question.
   - Nothing is sent anywhere.
-- **Public-facing text:** don't use trademarked character names. The spider costume is the "web-slinger suit".
+- **Public-facing text:** don't use trademarked character names. The heroes are the "web-slinger", "caped flyer", "speedster", "night guardian" and "shield hero"; the battle beam is "<NAME>... BEEEAM!".
 - **Look:**
   - Chunky crisp pixel art for the pets, with smooth soft effects around them.
   - The retired teal blob ("flippy" id) falls back to the default pet if it is still in someone's settings.
