@@ -17,7 +17,7 @@ namespace Flippy
         readonly Random rng = new Random();
         readonly List<Particle> parts = new List<Particle>();
         readonly Bubble bub = new Bubble();
-        readonly Settings cfg; readonly Needs needs; readonly Media media; readonly Effects fx = new Effects(); readonly Cloud cloud = new Cloud(); readonly Picker picker = new Picker();
+        readonly Settings cfg; readonly Needs needs; readonly Media media; readonly Effects fx = new Effects(); readonly PetMenu menu = new PetMenu();
         readonly List<FoodItem> foods = new List<FoodItem>();
         public Action OpenSettings, Quit;
 
@@ -65,7 +65,7 @@ namespace Flippy
             R.Body.MouseMove += (s, e) => MouseMoveH();
             R.Body.MouseUp += (s, e) => MouseUpH(e);
             R.Body.Cursor = Cursors.Hand;
-            picker.Chosen = sp => SwitchTo(sp);
+            menu.PetChosen = sp => SwitchTo(sp);
             R.Body.AllowDrop = true;
             R.Body.DragEnter += (s, e) =>
             {
@@ -161,8 +161,8 @@ namespace Flippy
         {
             if (e.Button == MouseButtons.Right)
             {
-                if (picker.Open || Tick - picker.ClosedAt < 10) picker.Close(Tick);
-                else if (cloud.Open || Tick - cloud.ClosedAt < 10) cloud.Close(Tick); else OpenMenu();
+                // right-click toggles (the click itself already closed an open menu a moment ago)
+                if (menu.Open || Environment.TickCount - menu.ClosedAtMs < 300) CloseMenus(); else OpenMenu(Cursor.Position);
                 return;
             }
             if (e.Button != MouseButtons.Left || !drag) return;
@@ -186,7 +186,7 @@ namespace Flippy
             }
         }
 
-        void OpenMenu()
+        void OpenMenu(Point at)
         {
             var items = new List<MenuItem>();
             items.Add(new MenuItem("Hop!", () => Hop(4.6, 0.9)));
@@ -203,12 +203,14 @@ namespace Flippy
             if (cfg.Smash) items.Add(new MenuItem("Smash the laptop", () => { parts.Clear(); Set("smash"); }));
             items.Add(MenuItem.Separator());
             items.Add(new MenuItem("Do your thing!", DoSignature));
-            items.Add(new MenuItem("Change pet...", () => { picker.Show(new PointF((float)X, (float)CY(Sprite.OY - 2)), W.Work, S); menuInit = false; }));
+            items.Add(MenuItem.Separator());
+            items.Add(MenuItem.Page("Change pet", SpeciesList.Current.ShortName));
             items.Add(new MenuItem("Settings...", () => { if (OpenSettings != null) OpenSettings(); }));
-            items.Add(new MenuItem("Bye, " + SpeciesList.Current.ShortName, () => { if (Quit != null) Quit(); }));
+            MenuItem bye = new MenuItem("Bye, " + SpeciesList.Current.ShortName, () => { if (Quit != null) Quit(); }); bye.Danger = true;
+            items.Add(bye);
             double[] nd = cfg.Needs ? new[] { needs.Fullness, needs.Energy, needs.Fun, needs.Love } : null;
-            cloud.Show(items, nd, new PointF((float)X, (float)CY(Sprite.OY - 2)), W.Work, S);
-            menuInit = false; if (Program.Verbose) Program.Log("menu opened");
+            menu.Show(items, nd, at, W.Work, W.Dpi / 96f);
+            menuInit = false;
         }
 
         public void SpawnFood(bool atCursor)
@@ -226,7 +228,7 @@ namespace Flippy
             cfg.Pet = sp.Id; cfg.Save();
             if (sp == SpeciesList.Current) { Say("that's me!", 80); return; }
             // cancel whatever he was doing, cleanly
-            cloud.Close(Tick); picker.Close(Tick); fx.WebOff();
+            CloseMenus(); fx.WebOff();
             suit = false; rot = 0; eating = null; napping = false; thrown = false; drag = false;
             if (Mode == "smash") parts.Clear();
             pending = sp; Set("switch");
@@ -237,17 +239,20 @@ namespace Flippy
             if (m == "smash") parts.Clear();
             Set(m, m == "dance" ? 340 : 0);
         }
-        void CloseMenus() { cloud.Close(Tick); picker.Close(Tick); ClickWatch.Stop(); menuInit = false; }
-        public void Poked() { cloud.Close(Tick); if (!drag) { Set("wave"); poked = true; } }
+        public bool Busy;
+        Point HeadPoint() { return new Point((int)X, (int)CY(Sprite.OY - 2)); }
+        void CloseMenus() { menu.Close(); ClickWatch.Disarm(); menuInit = false; }
+        public void Poked() { CloseMenus(); if (!drag) { Set("wave"); poked = true; } }
         bool poked;
 
         // ---------- one tick (60 per second) ----------
         public void Step()
         {
             Tick++; T++;
-            if (menuInit && !cloud.Open && !picker.Open) { ClickWatch.Stop(); menuInit = false; }   // closed by picking an item
+            if (Busy && Tick % 30 == 0) System.Threading.Thread.Sleep(400);   // test only: a stalled UI thread
+            if (menuInit && !menu.Open) { ClickWatch.Disarm(); menuInit = false; }   // closed by picking an item
             if (Tick == 1 && TestX >= 0) X = TestX;
-            if (Tick == 90 && ForceMode != null) { if (ForceMode == "food") SpawnFood(false); else if (ForceMode == "menu") OpenMenu(); else if (ForceMode == "picker") picker.Show(new PointF((float)X, (float)CY(Sprite.OY - 2)), W.Work, S); else if (ForceMode == "switch") SwitchTo(SpeciesList.All[SpeciesList.All.IndexOf(SpeciesList.Current) == 0 ? 1 : 0]); else if (ForceMode == "signature") DoSignature(); else Set(ForceMode, 600); }
+            if (Tick == 90 && ForceMode != null) { if (ForceMode == "food") SpawnFood(false); else if (ForceMode == "menu") OpenMenu(HeadPoint()); else if (ForceMode == "picker") { OpenMenu(HeadPoint()); menu.ShowPets(); } else if (ForceMode == "switch") SwitchTo(SpeciesList.All[SpeciesList.All.IndexOf(SpeciesList.Current) == 0 ? 1 : 0]); else if (ForceMode == "signature") DoSignature(); else Set(ForceMode, 600); }
             if (ForceMode == "watch" || ForceMode == "paused") { videoSeen = Tick; videoRect = W.Work; }
             if (Tick % 10 == 0 || drag) W.Update(X, Y);
 
@@ -281,21 +286,20 @@ namespace Flippy
                     rot = Math.Max(-35, Math.Min(35, -dvx * 2.2));       // dangles like he's being carried
                 }
             }
-            else if (cloud.Open || picker.Open)
+            else if (menu.Open)
             {
                 L.EyeStyle = "up"; rot = 0;
                 if (Mode == "sleep") Set("idle", 60);
                 Rectangle body = new Rectangle(R.Body.SX, R.Body.SY, R.Body.Surf.W, R.Body.Surf.H);
-                Rectangle menu = cloud.Open ? cloud.Bounds : picker.Bounds;
-                bool over = body.Contains(cur) || menu.Contains(cur);
-                if (!menuInit) { menuInit = true; menuFg = Native.Foreground(); menuAway = 0; ClickWatch.Start(); }   // just opened
-                menuAway = over ? 0 : menuAway + 1;
-                string why = ClickWatch.ClickedOutside(R.Body.Handle, cloud.Handle, picker.Handle) ? "click"   // clicked anywhere else
+                bool near = body.Contains(cur) || menu.Bounds.Contains(cur);
+                if (!menuInit) { menuInit = true; menuFg = Native.Foreground(); menuAway = 0; ClickWatch.Arm(); }   // just opened
+                menuAway = near ? 0 : menuAway + 1;
+                string why = ClickWatch.ClickedOutside(menu.PanelContains) ? "click"     // any click that isn't on the menu (his body too)
                            : Native.EscDown() ? "esc"
-                           : Native.Foreground() != menuFg ? "focus"                          // Alt+Tab / another window came to the front
-                           : menuAway > 240 ? "away" : null;                                    // cursor wandered off for 4 seconds
-                if (why != null) { if (Program.Verbose) Program.Log("menu closed: " + why + (why == "focus" ? " [" + Native.Title(menuFg) + "] -> [" + Native.Title(Native.Foreground()) + "]" : "")); CloseMenus(); }
-                picker.Tick();
+                           : Native.Foreground() != menuFg ? "focus"                     // Alt+Tab / another window came to the front
+                           : menuAway > 240 ? "away" : null;                               // cursor wandered off for 4 seconds
+                if (why != null) { if (Program.Verbose) Program.Log("menu closed: " + why); CloseMenus(); }
+                menu.Tick();
             }
             else
             {

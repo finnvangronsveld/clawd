@@ -9,14 +9,14 @@ using System.Windows.Forms;
 [assembly: AssemblyTitle("Flippy")]
 [assembly: AssemblyProduct("Flippy")]
 [assembly: AssemblyDescription("A little desktop buddy")]
-[assembly: AssemblyVersion("2.3.0.0")]
-[assembly: AssemblyFileVersion("2.3.0.0")]
+[assembly: AssemblyVersion("2.4.0.0")]
+[assembly: AssemblyFileVersion("2.4.0.0")]
 
 namespace Flippy
 {
     static class Program
     {
-        public const string Version = "2.3";
+        public const string Version = "2.4";
         static Pet pet;
         static Settings cfg;
         static Needs needs;
@@ -77,6 +77,7 @@ namespace Flippy
             pet = new Pet(cfg, needs);
             if (test) pet.TestX = Array.IndexOf(args, "--x") >= 0 ? int.Parse(args[Array.IndexOf(args, "--x") + 1]) : -1;
             pet.ForceMode = forceMode;
+            pet.Busy = test && Array.IndexOf(args, "--busy") >= 0;
             pet.OpenSettings = ShowSettings;
             pet.Quit = () => { pet.SaveAll(); Application.Exit(); };
 

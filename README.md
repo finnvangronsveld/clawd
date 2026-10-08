@@ -21,7 +21,7 @@ You don't need admin rights or anything else installed: Flippy is a single small
 
 ## Pick your pet
 
-Right-click your pet and choose **Change pet...**. A thought cloud opens with a live preview of every pet. Click one, and your current pet does a front flip, there's a poof, and the new one lands in the same spot. You can also choose in **Settings**.
+Right-click your pet and choose **Change pet**. The menu switches to a list with a live preview of every pet. Click one, and your current pet does a front flip, there's a poof, and the new one lands in the same spot. You can also choose in **Settings**.
 
 - **Flip** (the default): a flip phone with feelings. His face lives on the LCD screen.
 - **Hopper**: a frog who flips.
@@ -30,7 +30,7 @@ Right-click your pet and choose **Change pet...**. A thought cloud opens with a 
 
 Flip, Hopper and Flapjack all do a front flip as their signature move: Flippy is named after Flipforward.
 
-Every pet can do everything below. The menu closes when you click elsewhere, press Esc, switch windows, or move away. Your choice, settings and his hunger levels are remembered.
+Every pet can do everything below. The menu closes when you pick something, click anywhere else (him included), press Esc, switch windows, or move away. Your choice, settings and his hunger levels are remembered.
 
 ## Playing with him
 
@@ -42,7 +42,7 @@ Every pet can do everything below. The menu closes when you click elsewhere, pre
 | **Throw him** | Flies, spins, bounces off the screen edges, and lands dizzy after a big throw. You can land him on a window. |
 | Rub the cursor over him | Blushes and floats hearts |
 | Bring the cursor near | Waves hi |
-| Right-click | Opens his thought-cloud menu, with his mood bars on top |
+| Right-click | Opens his menu at your cursor: his name and mood bars on top, then everything he can do |
 | **Do your thing!** (menu) | His signature move |
 | **Give him a snack** (menu) | A cookie, pizza, apple or donut drops in. Drag it to him, or he walks over and eats it in three bites. |
 | **Drop a file on him** | Chews on it and has opinions ("a pdf... very official", "I'm NOT running that"). Your file isn't touched. |

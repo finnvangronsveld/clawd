@@ -19,7 +19,7 @@ Starting `Flippy.exe` (without `--test`) points the shortcuts at whichever exe w
 ## For the website (current facts)
 
 - **Name:** Flippy, after the owner's brand Flipforward. Tagline: "A little pixel buddy who lives on your Windows desktop."
-- **Latest version:** 2.3 (`Program.Version`). Releases: https://github.com/finnvangronsveld/flippy/releases
+- **Latest version:** 2.4 (`Program.Version`). Releases: https://github.com/finnvangronsveld/flippy/releases
 - **Download (always the latest):** https://github.com/finnvangronsveld/flippy/releases/latest/download/Flippy.zip
   - Unzip it and double-click `Install Flippy.cmd`.
   - Needs Windows 10 or 11. No admin rights, nothing else to install.
@@ -60,7 +60,7 @@ Starting `Flippy.exe` (without `--test`) points the shortcuts at whichever exe w
     - swings across the screen in his web-slinger suit
     - smashes his laptop, or does his signature move
   - **Menus:**
-    - a thought-cloud right-click menu with mood bars
+    - a clean right-click menu at the cursor: the pet with name, tagline and mood bars on top, actions in groups, "Change pet" as a page with live previews
     - a settings window: pick the pet, turn each feature on or off, set size, activity and chattiness, start with Windows, reset needs
   - **Stays out of the way:** never steals focus, and isn't in the taskbar or Alt+Tab.
 - **Privacy:** everything stays on the PC. Nothing is sent anywhere, and data lives in `%APPDATA%\Flippy`.
@@ -71,6 +71,7 @@ Starting `Flippy.exe` (without `--test`) points the shortcuts at whichever exe w
   - **Menus:** while a menu is open, it notices mouse clicks (only where they happen) so it knows when to close.
 - **Open source:** C#, built with the compiler that ships with Windows. Public repo above.
 - **Changelog:**
+  - **2.4:** New right-click menu: a proper panel at the cursor instead of the thought cloud; "Change pet" is a page inside it. Closing on an outside click now really works (the click watcher runs on its own thread).
   - **2.3:** The menus (the right-click cloud and "Change pet...") now close reliably on a click outside them, on Esc, when you switch windows, or after 4 s with the cursor away.
   - **2.2:**
     - Flip is now the default pet, and Hopper and Flapjack were added.
@@ -92,8 +93,7 @@ Starting `Flippy.exe` (without `--test`) points the shortcuts at whichever exe w
 | `src/Art.cs` | `Pal`, `Cells` (the pixel canvas), `Glyphs`, `Look` (this frame's pose), and `Sprite`. `Sprite` holds the shared props (headphones, nightcap, mug, snacks, laptop, the "!"), the species-agnostic web-slinger suit, the popcorn bucket, the gun bitmaps and `IconArt`. |
 | `src/Render.cs` | `Renderer`: cells → screen. **Body** window (the pet plus the gun; the only window that takes clicks) and **Fx** window (click-through: shadow, movie-night glow, particles, bubble). Squash/stretch and rotation. |
 | `src/Pet.cs` + `src/Behaviours.cs` | `partial class Pet`: body, senses, mouse, menu (`OpenMenu`), `SwitchTo`, `Triggers`, `PickActivity`, and the mode switch (`Behave`). |
-| `src/Picker.cs` | The "Change pet..." thought cloud: live previews, hover in the species' accent colour, a check on the current pet. |
-| `src/Cloud.cs` | The right-click thought-cloud menu, with mood bars. |
+| `src/Menu.cs` | `PetMenu` + `MenuItem`: the right-click menu. **One** layered window that opens at the cursor (flipped to stay on screen, sized by DPI). Main page: header (pet thumb, name, tagline, mood bars), items with separators, `MenuItem.Page` "Change pet" (switches to the pets page in the same window: live previews, check on the current pet), `Danger` item for Bye. An item runs on mouse-up over the same row it went down on; the menu hides first. |
 | `src/Settings.cs` | `Store` (key=value files in `%APPDATA%\Flippy`), `Settings` (toggles, sliders, `Pet=<id>`, and the settings form with its Pet section), and `Needs`. |
 | `src/Migration.cs` | The **only** code that knows the old name. It copies settings and needs from the old folder once, stops an old running instance, and replaces old shortcuts. |
 | `src/Food.cs`, `Effects.cs`, `Media.cs`, `Native.cs`, `Layered.cs`, `World.cs` | Snacks, pellets and the web line, play/pause (WinRT via reflection), P/Invoke, per-pixel-alpha windows, and monitors/DPI. |
@@ -119,15 +119,16 @@ Starting `Flippy.exe` (without `--test`) points the shortcuts at whichever exe w
 - `Look` is reset every tick, and modes set it each frame. Persistent state (`suit`, `Dir`) lives in `Pet`.
 - **Art:** draw only into `Cells` (`Rect`/`Dot`/`Glyph`), never anti-aliased. Chunky pixels, a dark outline, a light top-left edge and a shaded bottom-right.
 - **Menus close via `ClickWatch`** (in `Native.cs`):
-  - It's a low-level mouse hook (`WH_MOUSE_LL`), installed only while the cloud or the picker is open. It records where each mouse button went down.
+  - A low-level mouse hook (`WH_MOUSE_LL`) on its **own background thread** (with its own message loop). It must stay there: Windows silently drops a hook whose thread answers slowly, and the UI thread is often busy (media polling, window scans, drawing). That was the 2.3 bug.
+  - It only records button-down points while **armed** (`Arm()` when a menu opens, `Disarm()` in `CloseMenus()`). Polling the buttons each tick is a backup.
   - Every tick, `Pet.Step` closes the menu if any of these happened:
-    - a click outside, from `ClickWatch.ClickedOutside(body, cloud, picker)`. It checks the window handle under the point, so see-through pixels count as outside.
+    - a click that isn't on the menu panel, from `ClickWatch.ClickedOutside(menu.PanelContains)`. Clicks on the pet count as outside; the soft shadow too.
     - Esc
     - the foreground window changed
     - the cursor has been away for 4 s
-  - `CloseMenus()` removes the hook.
+  - Right-click on the pet toggles: the press closes the menu, and the release doesn't reopen it (`ClosedAtMs`).
   - Don't go back to the "pressed since last call" bit of `GetAsyncKeyState`. It's shared system-wide and misses clicks.
-  - `--verbose` logs "menu opened" and "menu closed: click|esc|focus|away".
+  - `--verbose` logs "menu opened rows: i@x,y ...", "menu: pets page rows: ...", "outside click (hook|poll) at x,y" and "menu closed: click|esc|focus|away".
 - **Species:** behaviours never draw pet-specific pixels. Props are placed with the species' anchors (`MugSipX`, `HeldY`, `BangY`, `MaskLX`...).
 
 ## Adding a pet
@@ -143,10 +144,10 @@ Starting `Flippy.exe` (without `--test`) points the shortcuts at whichever exe w
 ## Testing (run it and look)
 
 - **Build:** `powershell -ExecutionPolicy Bypass -File build.ps1 -Out bin\Dev.exe`.
-- **Test switches:** `bin\Dev.exe --test --verbose [--pet <id>] [--mode <mode>] [--x <screenX>] [--data <dir>] [--old-data <dir>]`.
+- **Test switches:** `bin\Dev.exe --test --verbose [--pet <id>] [--mode <mode>] [--x <screenX>] [--data <dir>] [--old-data <dir>] [--busy]`.
   - `--test` uses its own mutex and poke event, and a **temp data folder** (`%TEMP%\FlippyTestData`, or `--data`). It never touches the real `%APPDATA%\Flippy`, and it skips the real migration and shortcut handling.
   - `--mode` takes any mode name, or `food`, `menu`, `picker`, `switch`, `signature`, `watch` or `paused`.
-  - **Menu closing:** open a menu with `--mode menu` or `picker`. Then click a dummy window that's already in front, and check the log for "menu closed: click". Send the synthetic clicks from a **DPI-aware** process, or the coordinates are off.
+  - **Menu closing:** open a menu with `--mode menu` or `picker` (add `--busy` to stall the UI thread 400 ms every half second). Click a dummy window that's already in front, the pet, an item, and "Change pet" → a pet (row centres are in the log), and check the log and that no menu window is left visible. Send the synthetic clicks from a **DPI-aware** process, or the coordinates are off. Pass `--pet` so the test data's saved pet doesn't skew the switch test. The owner may be using the mouse during tests: a stray "outside click" at a point you didn't click is him.
   - `--old-data` tests the settings migration from a fake old folder.
   - Logs go to `<data>\flippy-test.log`.
 - **Art refactors:** `--dump-sprites` before and after, then `python tools/diff_sprites.py <before> <after> <diff_out>`.

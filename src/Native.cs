@@ -228,50 +228,70 @@ namespace Flippy
         }
     }
 
-    // Watches for mouse clicks anywhere on screen while a menu is open (a low-level mouse hook, so no click is
-    // ever missed). Records only that a button went down and where - nothing else. Off when no menu is open.
+    // Notices mouse clicks anywhere on screen while a menu is open, so the menu can close when you click
+    // elsewhere. Two ways, so no click is missed:
+    //  - a low-level mouse hook on its own little thread (it must answer fast; Windows silently drops hooks
+    //    whose thread is busy, which is what happened when it ran on the UI thread), and
+    //  - polling the buttons every tick as a backup.
+    // Only records where a button went down, and only while armed (a menu is open). Nothing else.
     static class ClickWatch
     {
         delegate IntPtr HookProc(int code, IntPtr wp, IntPtr lp);
         [StructLayout(LayoutKind.Sequential)] struct MSLL { public Native.POINT pt; public int mouseData, flags, time; public IntPtr extra; }
+        [StructLayout(LayoutKind.Sequential)] struct MSG { public IntPtr hwnd; public uint message; public IntPtr wParam, lParam; public uint time; public Native.POINT pt; }
         [DllImport("user32.dll", SetLastError = true)] static extern IntPtr SetWindowsHookEx(int id, HookProc fn, IntPtr mod, uint thread);
-        [DllImport("user32.dll")] static extern bool UnhookWindowsHookEx(IntPtr h);
         [DllImport("user32.dll")] static extern IntPtr CallNextHookEx(IntPtr h, int code, IntPtr wp, IntPtr lp);
+        [DllImport("user32.dll")] static extern int GetMessage(out MSG m, IntPtr h, uint min, uint max);
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] static extern IntPtr GetModuleHandle(string name);
-        [DllImport("user32.dll")] static extern IntPtr WindowFromPoint(Native.POINT p);
-        [DllImport("user32.dll")] static extern IntPtr GetAncestor(IntPtr h, uint f);
+        [DllImport("user32.dll")] static extern bool GetCursorPos(out Native.POINT p);
 
-        static readonly HookProc proc = Hook;      // kept alive for as long as the hook exists
+        static readonly HookProc proc = Hook;      // kept alive for the life of the app
         static IntPtr hook;
+        static System.Threading.Thread thread;
+        static volatile bool armed;
+        static bool wasDown;
         static readonly List<Native.POINT> downs = new List<Native.POINT>();
-        public static bool Active { get { return hook != IntPtr.Zero; } }
 
-        public static void Start()
+        public static void Arm()
         {
             lock (downs) downs.Clear();
-            if (hook == IntPtr.Zero) hook = SetWindowsHookEx(14, proc, GetModuleHandle(null), 0);    // WH_MOUSE_LL
+            wasDown = Native.AnyMouseButtonDown();
+            armed = true;
+            if (thread == null)
+            {
+                thread = new System.Threading.Thread(() =>
+                {
+                    hook = SetWindowsHookEx(14, proc, GetModuleHandle(null), 0);      // WH_MOUSE_LL
+                    if (Program.Verbose) Program.Log("click watch hook " + (hook != IntPtr.Zero ? "on" : "FAILED"));
+                    MSG m; while (GetMessage(out m, IntPtr.Zero, 0, 0) > 0) { }
+                });
+                thread.IsBackground = true; thread.Name = "ClickWatch";
+                thread.Start();
+            }
         }
-        public static void Stop() { if (hook != IntPtr.Zero) { UnhookWindowsHookEx(hook); hook = IntPtr.Zero; } lock (downs) downs.Clear(); }
+        public static void Disarm() { armed = false; lock (downs) downs.Clear(); }
+
         static IntPtr Hook(int code, IntPtr wp, IntPtr lp)
         {
             int m = (int)wp;
-            if (code >= 0 && (m == 0x201 || m == 0x204 || m == 0x207 || m == 0x20B))      // L/R/M/X button down
+            if (armed && code >= 0 && (m == 0x201 || m == 0x204 || m == 0x207 || m == 0x20B))      // L/R/M/X button down
             {
                 MSLL d = (MSLL)Marshal.PtrToStructure(lp, typeof(MSLL));
                 lock (downs) if (downs.Count < 16) downs.Add(d.pt);
             }
             return CallNextHookEx(hook, code, wp, lp);
         }
-        // true if a click landed on a window that isn't one of `mine` (clicks on see-through pixels count as outside)
-        public static bool ClickedOutside(params IntPtr[] mine)
+
+        // call once per tick while armed: true if a button went down anywhere that `inside` says isn't the menu
+        public static bool ClickedOutside(Func<int, int, bool> inside)
         {
+            bool outside = false;
             Native.POINT[] ps; lock (downs) { ps = downs.ToArray(); downs.Clear(); }
-            foreach (Native.POINT p in ps)
-            {
-                IntPtr root = GetAncestor(WindowFromPoint(p), 2);
-                if (Array.IndexOf(mine, root) < 0) return true;
-            }
-            return false;
+            foreach (Native.POINT p in ps) if (!inside(p.X, p.Y)) { outside = true; if (Program.Verbose) Program.Log("outside click (hook) at " + p.X + "," + p.Y); }
+            bool d = Native.AnyMouseButtonDown();
+            if (d && !wasDown && ps.Length == 0) { Native.POINT c; if (GetCursorPos(out c) && !inside(c.X, c.Y)) { outside = true; if (Program.Verbose) Program.Log("outside click (poll) at " + c.X + "," + c.Y); } }
+            wasDown = d;
+            return outside;
         }
     }
 }
