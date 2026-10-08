@@ -137,6 +137,8 @@ namespace Flippy
                         L.Arms = VY < 0 ? "up" : (thrown ? ((Tick / 5) % 2 == 0 ? "up" : "out") : "out");
                         if (thrown) L.Mouth = "o";
                         if (Y - 16 * S < W.Mon.Top) { Y = W.Mon.Top + 16 * S; VY = Math.Abs(VY) * 0.5; }
+                        // thrown into his sandcastle: it's gone
+                        if (thrown && castle.Hits(X, Y, 8 * S, S)) SmashCastle();
                         if (VY > 0)
                         {
                             bool landed = false;
@@ -152,7 +154,8 @@ namespace Flippy
                                     if (impact > 4 * K) squashT = 14;
                                     bool dizzy = thrown && (Math.Abs(spinV) > 8 || impact > 6 * K);
                                     VY = 0; VX = 0; rot = 0; spinV = 0; walkOff = false;
-                                    if (dizzy) { thrown = false; Set("dizzy", 200); }
+                                    if (castleSad) { castleSad = false; thrown = false; Set("castlesad"); }
+                                    else if (dizzy) { thrown = false; Set("dizzy", 200); }
                                     else { thrown = false; Set("idle", 50); }
                                 }
                             }
@@ -562,6 +565,12 @@ namespace Flippy
                         }
                         break;
                     }
+                case "castlesad":  // you threw him through his sandcastle
+                    Y = ground; L.EyeStyle = "sad"; L.Mouth = "frown"; L.Arms = "down"; L.Sit = t < 160;
+                    if (t % 40 == 20) Bit(Sprite.OX + 8 + rng.Next(6), Sprite.OY + 6, (rng.NextDouble() - 0.5) * 0.2, 0.1, 30, Pal.Blue, 1, 0.04);    // a tear
+                    if (t == 200) Chat(Pick(new[] { "I'll build a better one", "fine. sand is overrated", "*sniff*" }), 110);
+                    if (t >= 280) Set("idle", 60);
+                    break;
                 case "site":       // his creator's website, or his own home
                     {
                         Y = ground - siteJy;
@@ -707,6 +716,20 @@ namespace Flippy
 
         // ---------------- web-slinging ----------------
         double battleHome, battleDX, siteJy, siteJv; int beachT;
+
+        void SmashCastle()
+        {
+            double cx = Sprite.OX + 11 + (castle.X - X) / S;           // the castle, in his cell coordinates
+            int[] sand = { Pal.C(236, 206, 140), Pal.C(250, 230, 176), Pal.C(204, 166, 98) };
+            for (int i = 0; i < 46; i++)
+                Bit(cx + (rng.NextDouble() - 0.5) * 20, Sprite.OY + 16 - rng.Next(16), (rng.NextDouble() - 0.5) * 1.6 + VX / S * 0.25, -0.4 - rng.NextDouble() * 1.1, 50 + rng.Next(30), sand[rng.Next(3)], 1 + rng.Next(2), 0.06, true);
+            Float("dot", cx + 1, Sprite.OY + 2, 0.25, -0.35, 40, Pal.C(230, 60, 70));      // the little flag flies off
+            castle.Hide(); shake = 8;
+            castleSad = true;
+            Say(Pick(new[] { "NOOO, my castle!", "my masterpiece!!", "hours of work...", "why would you do that?!" }), 130);
+            needs.Fun -= 4;
+        }
+        bool castleSad;
 
         // ======================= superheroes =======================
         static readonly string[] Heroes = { "web", "caped", "speed", "night", "shield" };

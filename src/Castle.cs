@@ -27,6 +27,13 @@ namespace Flippy
         public void Begin(double x, double y) { Active = true; Stage = 0; X = x; Y = y; life = 0; crumble = 0; lastKey = ""; }
         public void Finish() { life = 60 * 180; }            // stays three minutes, then crumbles
         public void Hide() { Active = false; win.Hide(); }
+        // does something at (x, feetY), about `half` wide, touch the castle? (only once it's more than a pile)
+        public bool Hits(double x, double feetY, double half, int S)
+        {
+            if (!Active || Stage < 2) return false;
+            double w = CWd * S / 2.0, top = Y - (Stage >= 5 ? CHt : Stage >= 4 ? 15 : Stage >= 3 ? 12 : 5) * S;
+            return Math.Abs(x - X) < w * 0.8 + half && feetY > top + 2 * S;
+        }
 
         public void Tick(int S)
         {

@@ -19,7 +19,7 @@ Starting `Flippy.exe` (without `--test`) points the shortcuts at whichever exe w
 ## For the website (current facts)
 
 - **Name:** Flippy, after the owner's brand Flipforward. Tagline: "A little pixel buddy who lives on your Windows desktop."
-- **Latest version:** 2.6 (`Program.Version`). Releases: https://github.com/finnvangronsveld/flippy/releases
+- **Latest version:** 2.6.1 (`Program.Version`). Releases: https://github.com/finnvangronsveld/flippy/releases
 - **Download (always the latest):** https://github.com/finnvangronsveld/flippy/releases/latest/download/Flippy.zip
   - Unzip it and double-click `Install Flippy.cmd`.
   - Needs Windows 10 or 11. No admin rights, nothing else to install.
@@ -62,7 +62,7 @@ Starting `Flippy.exe` (without `--test`) points the shortcuts at whichever exe w
     - aims a pellet gun at your cursor and does trickshots (360 no-scope, ricochets)
     - superheroes (generic, no real characters): web-slinger (pendulum swinging, a rope-like web line), caped flyer (flies across the screen), speedster (zooms with a lightning trail), night guardian (grapples up, glides down), shield hero (throws a bouncing shield)
     - an anime battle with his shadow clone: auras, a dash and clash, a beam struggle he wins
-    - builds a sandcastle in a corner (six stages; it crumbles after a few minutes)
+    - builds a sandcastle in a corner (six stages; it crumbles after a few minutes). Throw him into it and it bursts into sand, and he sulks
     - smashes his laptop, or does his signature move
   - **Menus:**
     - a hologram right-click menu: he projects it above his head (beam, glow, scanlines, flickers on). Name and mood bars, Play and Tricks button grids, then Pocket, Change pet (live previews), Settings, Bye
@@ -79,6 +79,7 @@ Starting `Flippy.exe` (without `--test`) points the shortcuts at whichever exe w
   - **Claude Code:** the hooks pass only the project folder name and Claude's short status message or question to the pet, locally.
 - **Open source:** C#, built with the compiler that ships with Windows. Public repo above.
 - **Changelog:**
+  - **2.6.1:** throwing him into his sandcastle destroys it (a burst of sand, then he sulks).
   - **2.6:** five superheroes (web-slinger with real pendulum physics and a wobbly web line, caped flyer, speedster, night guardian, shield hero), the anime battle, sandcastles, Flipforward website reactions, and the pocket pops up when you hover him.
   - **2.5:** Claude Code buddy (tells you when Claude is done or has a question), a pocket for 3 files, the hologram menu, and animation polish: walking feet really step, a bounce on every step, a squash when he turns, and Flip's mouth expressions now read clearly.
   - **2.4:** New right-click menu: a proper panel at the cursor instead of the thought cloud; "Change pet" is a page inside it. Closing on an outside click now really works (the click watcher runs on its own thread).
@@ -145,7 +146,7 @@ Starting `Flippy.exe` (without `--test`) points the shortcuts at whichever exe w
   - Don't go back to the "pressed since last call" bit of `GetAsyncKeyState`. It's shared system-wide and misses clicks.
   - `--verbose` logs "menu opened rows: i@x,y ...", "menu: pets page rows: ...", "outside click (hook|poll) at x,y" and "menu closed: click|esc|focus|away".
 - **Superheroes:** `StartHero(id)` -> `suitup` -> `swing` / `fly` / `zoom` / `glide` / `shieldthrow` -> `heropose`. `HeroMode()` lists the modes that keep the suit on. Swinging is a pendulum in angle space (`theta`, `omega`, rope length `ropeL`, gravity `0.21*K`): attaching converts his velocity to `omega`, reeling in keeps angular momentum, he lets go on the upswing with the swing's own velocity. Anchors: your cursor, a window top (`Native.FindTop`), the top of the screen, else a point in the air ahead. `fx.Web(..., wobble, sag, phase, reach)` draws the line as a wobbly curve that unrolls when shot.
-- **Battle / sandcastle / sites:** `StartBattle()`, `StartBeach()` (walks to the nearer bottom corner first). Sites: every 30 ticks, if the foreground window is a browser (`Native.IsBrowser`, by process name) its title is matched ("Flippy" + "pixel buddy" = home, "flipforward" = creator) -> mode `site` once per visit (again after 10 min).
+- **Battle / sandcastle / sites:** `StartBattle()`, `StartBeach()` (walks to the nearer bottom corner first). In `fall`, a thrown pet that touches the castle (`Castle.Hits`) calls `SmashCastle()` (sand burst, castle hidden) and sulks in `castlesad` after landing. Sites: every 30 ticks, if the foreground window is a browser (`Native.IsBrowser`, by process name) its title is matched ("Flippy" + "pixel buddy" = home, "flipforward" = creator) -> mode `site` once per visit (again after 10 min).
 - **Pocket peek:** cursor still on him for 40 ticks with files in the pocket -> the menu opens on the pocket page with `peek = true` (closes after 40 ticks away instead of 240; going "<" to the main menu ends the peek).
 - **Template pets:** a stepping foot (`L.Phase` 1 or 3) is lifted one cell and moved forward (`L.Face`). `MouthRows = 2` for small faces (Flip's LCD) keeps every mouth inside two rows. Walking/chasing also bobs the whole sprite one cell per step (`bobY` in `Pet`, kept out of the shadow).
 - **Species:** behaviours never draw pet-specific pixels. Props are placed with the species' anchors (`MugSipX`, `HeldY`, `BangY`, `MaskLX`...).
@@ -166,7 +167,7 @@ Starting `Flippy.exe` (without `--test`) points the shortcuts at whichever exe w
 - **Test switches:** `bin\Dev.exe --test --verbose [--pet <id>] [--mode <mode>] [--x <screenX>] [--data <dir>] [--old-data <dir>] [--busy]`.
   - `--test` uses its own mutex and poke event, and a **temp data folder** (`%TEMP%\FlippyTestData`, or `--data`). It never touches the real `%APPDATA%\Flippy`, and it skips the real migration and shortcut handling.
   - `--mode` takes any mode name, or `food`, `menu`, `picker`, `switch`, `signature`, `watch` or `paused`.
-  - **New modes:** `--mode hero-web|hero-caped|hero-speed|hero-night|hero-shield`, `battle`, `beach`, `site-home`, `site-creator`. With `--verbose`, hero modes log `hero <mode> t x y rot` every 5 ticks (check for jumps).
+  - **New modes:** `--mode hero-web|hero-caped|hero-speed|hero-night|hero-shield`, `battle`, `beach`, `castlethrow` (a finished castle next to him, then he gets thrown at it), `site-home`, `site-creator`. With `--verbose`, hero modes log `hero <mode> t x y rot` every 5 ticks (check for jumps).
   - **Claude alerts:** start a test pet, then pipe a hook JSON **file** into `bin\Dev.exe --notify stop|notification|question --test` (Git Bash `echo` mangles backslashes, so write the JSON with Python). `--claude-hooks on|off` connects/disconnects; set `FLIPPY_CLAUDE_SETTINGS=<copy of settings.json>` to test on a copy, never on the real file.
   - **Pocket:** `--mode pocket` opens the pocket page; seed `<data>\pocket.txt`. Drag tests need the drag source in **another process** (a drag is a modal loop) and real `mouse_event` moves; Explorer is the trustworthy drop target.
   - **Menu closing:** open a menu with `--mode menu` or `picker` (add `--busy` to stall the UI thread 400 ms every half second). Click a dummy window that's already in front, the pet, an item, and "Change pet" → a pet (row centres are in the log), and check the log and that no menu window is left visible. Send the synthetic clicks from a **DPI-aware** process, or the coordinates are off. Pass `--pet` so the test data's saved pet doesn't skew the switch test. The owner may be using the mouse during tests: a stray "outside click" at a point you didn't click is him.

@@ -73,7 +73,7 @@ His shadow shows up. They power up (auras, sparks, the ground shakes), dash in a
 
 ## Sandcastles
 
-Sometimes he walks to a corner of your screen and builds a sandcastle: a pile, a base, towers, a keep with a door, battlements, a flag and a shell. It stays for a few minutes, then crumbles.
+Sometimes he walks to a corner of your screen and builds a sandcastle: a pile, a base, towers, a keep with a door, battlements, a flag and a shell. It stays for a few minutes, then crumbles. Throw him into it and it bursts into sand (he is not amused).
 
 ## Flipforward
 
