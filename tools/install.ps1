@@ -54,7 +54,7 @@ try {
     New-Item -Path $key -Force | Out-Null
     $un = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' + (Join-Path $dest 'uninstall.ps1') + '"'
     $props = @{
-        DisplayName = 'Flippy'; DisplayIcon = "$exe,0"; Publisher = 'finnvangronsveld'; DisplayVersion = '2.4'
+        DisplayName = 'Flippy'; DisplayIcon = "$exe,0"; Publisher = 'finnvangronsveld'; DisplayVersion = '2.5'
         InstallLocation = $dest; UninstallString = $un; QuietUninstallString = $un
         URLInfoAbout = 'https://github.com/finnvangronsveld/flippy'
     }

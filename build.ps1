@@ -11,7 +11,7 @@ $out = Join-Path $PSScriptRoot $Out
 New-Item -ItemType Directory -Force (Split-Path $out) | Out-Null
 $src = Get-ChildItem (Join-Path $PSScriptRoot 'src') -Filter *.cs | ForEach-Object { $_.FullName }
 $args = @('/nologo', '/target:winexe', '/optimize+', '/platform:anycpu', "/out:$out", '/win32icon:flippy.ico',
-          '/r:System.dll', '/r:System.Core.dll', '/r:System.Drawing.dll', '/r:System.Windows.Forms.dll', '/r:System.Management.dll',
+          '/r:System.dll', '/r:System.Core.dll', '/r:System.Drawing.dll', '/r:System.Windows.Forms.dll', '/r:System.Management.dll', '/r:System.Web.Extensions.dll',
           "/r:$fw\System.Runtime.WindowsRuntime.dll") + $src
 & $csc @args
 if ($LASTEXITCODE -ne 0) { throw "build failed" }

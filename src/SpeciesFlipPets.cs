@@ -80,7 +80,7 @@ namespace Flippy
             ArmLX = 4; ArmRX = 17; ArmY = 7; ShoulderLX = 4; ShoulderRX = 18; ShoulderY = 8;
             FootLX = 5; FootRX = 12; FootW = 4; FootY = 13; FootH = 2;
             EyeKind = "bead"; EyeLX = 8; EyeRX = 12; EyeY = -1; EyeBg = Colors['s'];
-            MouthX = 10; MouthW = 2; MouthY = 2;
+            MouthX = 9; MouthW = 4; MouthY = 2; MouthRows = 2;
             BlushLX = 6; BlushRX = 14; BlushY = 2;
             MaskLX = 7; MaskRX = 11; MaskY = -1; ChestX = 10; ChestY = 9; SuitSplitY = 6;
             WebX0 = 4; WebX1 = 17; WebY0 = -3; WebY1 = 5; WebCols = new double[] { 5, 16 }; WebRows = new double[] { -3 };

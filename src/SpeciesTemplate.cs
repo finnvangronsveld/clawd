@@ -25,6 +25,7 @@ namespace Flippy
         public int Ink = Pal.Eye, EyeWhite = Pal.C(252, 252, 250);
         public double MouthX, MouthY; public int MouthW = 4;              // MouthX = left of the mouth
         public bool DefaultSmile = true;
+        public int MouthRows = 3;      // how many rows the mouth may use (a small LCD face only has 2: no tongue row)
         public double BlushLX, BlushRX, BlushY;
 
         protected void Build()
@@ -122,9 +123,15 @@ namespace Flippy
             }
             if (Feet)
             {
-                int lh = low ? 1 : (L.Phase == 1 ? FootH - 1 : FootH), rh = low ? 1 : (L.Phase == 3 ? FootH - 1 : FootH);
-                add(ox + FootLX, oy + FootY + (FootH - lh), FootW, Math.Max(1, lh), false);
-                add(ox + FootRX, oy + FootY + (FootH - rh), FootW, Math.Max(1, rh), false);
+                if (low) { add(ox + FootLX, oy + FootY + FootH - 1, FootW, 1, false); add(ox + FootRX, oy + FootY + FootH - 1, FootW, 1, false); }
+                else
+                {
+                    // walking: the stepping foot comes off the ground and moves forward a little
+                    int fwd = L.Face >= 0 ? 1 : -1;
+                    bool liftL = L.Phase == 1, liftR = L.Phase == 3;
+                    add(ox + FootLX + (liftL ? fwd : 0), oy + FootY - (liftL ? 1 : 0), FootW, FootH, false);
+                    add(ox + FootRX + (liftR ? fwd : 0), oy + FootY - (liftR ? 1 : 0), FootW, FootH, false);
+                }
             }
             int outline = backView ? rimLine : Outline;
             for (int y = 0; y < g.H; y++)
@@ -190,11 +197,20 @@ namespace Flippy
                 case "none":
                     if (DefaultSmile) { g.Dot(mx, my, Ink); g.Rect(mx + 1, my + 1, w - 2, 1, Ink); g.Dot(mx + w - 1, my, Ink); }
                     break;
-                case "smile": g.Dot(mx - 1, my, Ink); g.Rect(mx, my + 1, w, 1, Ink); g.Dot(mx + w, my, Ink); g.Rect(mx + w / 2 - 1, my + 2, 2, 1, Pal.Tongue); break;
+                case "smile":
+                    g.Dot(mx - 1, my, Ink); g.Rect(mx, my + 1, w, 1, Ink); g.Dot(mx + w, my, Ink);
+                    if (MouthRows >= 3) g.Rect(mx + w / 2 - 1, my + 2, 2, 1, Pal.Tongue);
+                    break;
                 case "o": g.Rect(mx + w / 2 - 1, my, 2, 2, Ink); break;
                 case "frown": g.Dot(mx, my + 1, Ink); g.Rect(mx + 1, my, w - 2, 1, Ink); g.Dot(mx + w - 1, my + 1, Ink); break;
-                case "yawn": g.Rect(mx, my, w, 3, Ink); g.Rect(mx + 1, my + 2, w - 2, 1, Pal.Tongue); break;
-                case "chomp": g.Rect(mx - 1, my, w + 2, 3, Ink); g.Rect(mx, my + 2, w, 1, Pal.Tongue); break;
+                case "yawn":
+                    if (MouthRows >= 3) { g.Rect(mx, my, w, 3, Ink); g.Rect(mx + 1, my + 2, w - 2, 1, Pal.Tongue); }
+                    else { g.Rect(mx, my, w, 2, Ink); g.Rect(mx + 1, my + 1, w - 2, 1, Pal.Tongue); }
+                    break;
+                case "chomp":
+                    if (MouthRows >= 3) { g.Rect(mx - 1, my, w + 2, 3, Ink); g.Rect(mx, my + 2, w, 1, Pal.Tongue); }
+                    else { g.Rect(mx - 1, my, w + 2, 2, Ink); g.Rect(mx, my + 1, w, 1, Pal.Tongue); }
+                    break;
                 case "chew": g.Rect(mx, my + 1, w, 1, Ink); break;
             }
         }

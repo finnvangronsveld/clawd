@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
 
@@ -17,7 +18,7 @@ namespace Flippy
         readonly Random rng = new Random();
         readonly List<Particle> parts = new List<Particle>();
         readonly Bubble bub = new Bubble();
-        readonly Settings cfg; readonly Needs needs; readonly Media media; readonly Effects fx = new Effects(); readonly PetMenu menu = new PetMenu();
+        readonly Settings cfg; readonly Needs needs; readonly Media media; readonly Effects fx = new Effects(); readonly PetMenu menu = new PetMenu(); readonly Pocket pocket = new Pocket();
         readonly List<FoodItem> foods = new List<FoodItem>();
         public Action OpenSettings, Quit;
 
@@ -66,6 +67,11 @@ namespace Flippy
             R.Body.MouseUp += (s, e) => MouseUpH(e);
             R.Body.Cursor = Cursors.Hand;
             menu.PetChosen = sp => SwitchTo(sp);
+            pocket.Load();
+            menu.Pocket = pocket;
+            menu.PocketCopy = PocketCopy;
+            menu.PocketRemoved = i => pocket.Remove(i);
+            menu.PocketDropped = path => Say(Pick(new[] { "there you go!", "delivered!", "here it is!" }), 90);
             R.Body.AllowDrop = true;
             R.Body.DragEnter += (s, e) =>
             {
@@ -76,7 +82,14 @@ namespace Flippy
             {
                 fileHover = false;
                 string[] f = e.Data.GetData(DataFormats.FileDrop) as string[];
-                if (f != null && f.Length > 0) dropped = f;
+                if (Program.Verbose) Program.Log("files dropped: " + (f == null ? 0 : f.Length));
+                if (f != null && f.Length > 0)
+                {
+                    // into his pocket right away (only the paths; the files aren't opened or copied)
+                    stashFell = pocket.Add(f.Length > Pocket.Max ? f.Skip(f.Length - Pocket.Max) : f);
+                    stashTooMany = f.Length > Pocket.Max;
+                    dropped = f;
+                }
             };
             R.Body.Message += m => { if (m == Native.WM_CLIPBOARDUPDATE) clipPing = true; };
             R.Body.HandleCreated += (s, e) => { try { Native.AddClipboardFormatListener(R.Body.Handle); } catch { } };
@@ -91,7 +104,8 @@ namespace Flippy
             Mode = m; Timer = timer; T = 0; hover = 0;
         }
         public string ForceMode; public int TestX = -1;
-        void Say(string text, int ticks = 90) { bub.Text = text; bub.Ticks = ticks; bub.Spinner = false; bub.Thought = false; }
+        void Say(string text, int ticks = 90) { bub.Text = text; bub.Ticks = ticks; bub.Spinner = false; bub.Thought = false; bub.Tag = null; }
+        void SayTagged(string tag, string text, int ticks) { Say(text, ticks); bub.Tag = tag; }
         // chatter respects the chattiness slider
         void Chat(string text, int ticks = 100) { if (cfg.Chatty > 0.05 && rng.NextDouble() < Math.Min(1, cfg.Chatty)) Say(text, ticks); }
         double CX(double cx) { return X + (cx - (Sprite.OX + 11)) * S; }     // cell -> screen
@@ -162,7 +176,7 @@ namespace Flippy
             if (e.Button == MouseButtons.Right)
             {
                 // right-click toggles (the click itself already closed an open menu a moment ago)
-                if (menu.Open || Environment.TickCount - menu.ClosedAtMs < 300) CloseMenus(); else OpenMenu(Cursor.Position);
+                if (menu.Open || Environment.TickCount - menu.ClosedAtMs < 300) CloseMenus(); else OpenMenu(HeadPoint());
                 return;
             }
             if (e.Button != MouseButtons.Left || !drag) return;
@@ -176,6 +190,7 @@ namespace Flippy
                 if (sp > 12 * K) { Say(Pick(new[] { "AAAAA!", "wheeeeee!", "noooo!" }), 60); needs.Fun += 4; }
                 bub.Ticks = Math.Min(bub.Ticks, 60);
             }
+            else if (Mode == "alert") { Say(aKind == "ask" ? "go get 'em!" : "nice!", 60); Set("idle", 60); }      // got it, thanks
             else if (Mode == "sleep" || Mode == "yawn") { napping = false; Say("huh?!", 70); Hop(3.6, 0); }
             else if (Mode == "eat" || Mode == "smash" || Mode == "dizzy" || Mode == "swing") { }
             else
@@ -189,22 +204,21 @@ namespace Flippy
         void OpenMenu(Point at)
         {
             var items = new List<MenuItem>();
-            items.Add(new MenuItem("Hop!", () => Hop(4.6, 0.9)));
-            items.Add(new MenuItem("Chase my cursor", () => Set("chase", 300 + rng.Next(300))));
-            items.Add(new MenuItem("Dance", () => Set("dance", 340)));
-            items.Add(new MenuItem("Coffee break", () => Set("coffee")));
-            items.Add(new MenuItem("Think hard", () => { Set("think"); word = Pick(thinkWords); }));
-            items.Add(new MenuItem("Give him a snack", () => SpawnFood(true)));
-            if (cfg.Climbing) items.Add(new MenuItem("Climb a window", () => { if (!TryClimb()) Say("no window to climb!", 90); }));
-            items.Add(MenuItem.Separator());
-            if (cfg.Gun) items.Add(new MenuItem("Shoot my cursor", () => Set("gun")));
-            if (cfg.Tricks) items.Add(new MenuItem("Trickshot!", () => Set("trick")));
-            if (cfg.WebSwing) items.Add(new MenuItem("Web-swing!", () => Set("suitup")));
-            if (cfg.Smash) items.Add(new MenuItem("Smash the laptop", () => { parts.Clear(); Set("smash"); }));
-            items.Add(MenuItem.Separator());
-            items.Add(new MenuItem("Do your thing!", DoSignature));
-            items.Add(MenuItem.Separator());
-            items.Add(MenuItem.Page("Change pet", SpeciesList.Current.ShortName));
+            // the two button grids (a heading per group), then the rows below
+            items.Add(new MenuItem("Hop!", () => Hop(4.6, 0.9)) { Group = "Play" });
+            items.Add(new MenuItem("Dance", () => Set("dance", 340)) { Group = "Play" });
+            items.Add(new MenuItem("Chase me", () => Set("chase", 300 + rng.Next(300))) { Group = "Play" });
+            items.Add(new MenuItem("Snack", () => SpawnFood(true)) { Group = "Play" });
+            items.Add(new MenuItem("Coffee", () => Set("coffee")) { Group = "Play" });
+            items.Add(new MenuItem("Think", () => { Set("think"); word = Pick(thinkWords); }) { Group = "Play" });
+            if (cfg.Climbing) items.Add(new MenuItem("Climb", () => { if (!TryClimb()) Say("no window to climb!", 90); }) { Group = "Play" });
+            items.Add(new MenuItem("His thing!", DoSignature) { Group = "Play" });
+            if (cfg.Gun) items.Add(new MenuItem("Shoot cursor", () => Set("gun")) { Group = "Tricks" });
+            if (cfg.Tricks) items.Add(new MenuItem("Trickshot", () => Set("trick")) { Group = "Tricks" });
+            if (cfg.WebSwing) items.Add(new MenuItem("Web-swing", () => Set("suitup")) { Group = "Tricks" });
+            if (cfg.Smash) items.Add(new MenuItem("Smash laptop", () => { parts.Clear(); Set("smash"); }) { Group = "Tricks" });
+            items.Add(MenuItem.Page("Pocket", pocket.Files.Count == 0 ? "empty" : pocket.Files.Count + " / " + Pocket.Max, "pocket"));
+            items.Add(MenuItem.Page("Change pet", SpeciesList.Current.ShortName, "pets"));
             items.Add(new MenuItem("Settings...", () => { if (OpenSettings != null) OpenSettings(); }));
             MenuItem bye = new MenuItem("Bye, " + SpeciesList.Current.ShortName, () => { if (Quit != null) Quit(); }); bye.Danger = true;
             items.Add(bye);
@@ -240,8 +254,49 @@ namespace Flippy
             Set(m, m == "dance" ? 340 : 0);
         }
         public bool Busy;
-        Point HeadPoint() { return new Point((int)X, (int)CY(Sprite.OY - 2)); }
+        Point HeadPoint() { return new Point((int)X, (int)CY(Sprite.OY + SpeciesList.Current.HeadTop - 2)); }
         void CloseMenus() { menu.Close(); ClickWatch.Disarm(); menuInit = false; }
+        // ---------- the pocket ----------
+        int stashFell; bool stashTooMany;
+        void PocketCopy(int i)
+        {
+            if (i < 0 || i >= pocket.Files.Count) return;
+            string p = pocket.Files[i];
+            if (!Pocket.Exists(p)) { pocket.Remove(i); Say("hmm, that one's gone", 100); return; }
+            try
+            {
+                var list = new System.Collections.Specialized.StringCollection(); list.Add(p);
+                Clipboard.SetFileDropList(list);
+                Say("copied! paste it anywhere", 110);
+            }
+            catch { Say("oops, couldn't copy it", 90); }
+        }
+
+        // ---------- Claude Code alerts ----------
+        string alertKind, alertProject, alertText; int alertWait;
+        public void ClaudeAlert(string kind, string project, string text)
+        {
+            if (Program.Verbose) Program.Log("claude alert " + kind + " [" + project + "] " + text);
+            if (!cfg.ClaudeAlerts) return;
+            alertKind = kind == "ask" ? "ask" : "done"; alertProject = project; alertText = text; alertWait = 0;
+        }
+        // called every tick: start a waiting alert as soon as he can
+        void StartAlert()
+        {
+            if (alertKind == null || drag || menu.Open) return;
+            bool inAir = Mode == "fall" || Mode == "swing" || Mode == "switch" || Mode == "flip" || Mode == "trick" || Mode == "suitup" || Mode == "heropose";
+            if (inAir && ++alertWait < 300) return;
+            if (suit) { suit = false; Poof(); }
+            if (fx != null) fx.WebOff();
+            rot = 0; napping = false; eating = null;
+            if (Mode == "smash") parts.Clear();
+            aKind = alertKind; aProject = alertProject; aText = alertText; alertKind = null;
+            if (inAir) { SayTagged(AlertTag(), aText, aKind == "ask" ? 900 : 330); return; }     // still busy in the air: just say it
+            Set("alert");
+        }
+        string aKind, aProject, aText; double aJy, aJv;
+        string AlertTag() { return "Claude" + (string.IsNullOrEmpty(aProject) ? "" : " - " + aProject); }
+
         public void Poked() { CloseMenus(); if (!drag) { Set("wave"); poked = true; } }
         bool poked;
 
@@ -249,10 +304,11 @@ namespace Flippy
         public void Step()
         {
             Tick++; T++;
+            StartAlert();
             if (Busy && Tick % 30 == 0) System.Threading.Thread.Sleep(400);   // test only: a stalled UI thread
             if (menuInit && !menu.Open) { ClickWatch.Disarm(); menuInit = false; }   // closed by picking an item
             if (Tick == 1 && TestX >= 0) X = TestX;
-            if (Tick == 90 && ForceMode != null) { if (ForceMode == "food") SpawnFood(false); else if (ForceMode == "menu") OpenMenu(HeadPoint()); else if (ForceMode == "picker") { OpenMenu(HeadPoint()); menu.ShowPets(); } else if (ForceMode == "switch") SwitchTo(SpeciesList.All[SpeciesList.All.IndexOf(SpeciesList.Current) == 0 ? 1 : 0]); else if (ForceMode == "signature") DoSignature(); else Set(ForceMode, 600); }
+            if (Tick == 90 && ForceMode != null) { if (ForceMode == "food") SpawnFood(false); else if (ForceMode == "menu") OpenMenu(HeadPoint()); else if (ForceMode == "picker") { OpenMenu(HeadPoint()); menu.ShowPage("pets"); } else if (ForceMode == "pocket") { OpenMenu(HeadPoint()); menu.ShowPage("pocket"); } else if (ForceMode == "switch") SwitchTo(SpeciesList.All[SpeciesList.All.IndexOf(SpeciesList.Current) == 0 ? 1 : 0]); else if (ForceMode == "signature") DoSignature(); else Set(ForceMode, 600); }
             if (ForceMode == "watch" || ForceMode == "paused") { videoSeen = Tick; videoRect = W.Work; }
             if (Tick % 10 == 0 || drag) W.Update(X, Y);
 
@@ -294,7 +350,10 @@ namespace Flippy
                 bool near = body.Contains(cur) || menu.Bounds.Contains(cur);
                 if (!menuInit) { menuInit = true; menuFg = Native.Foreground(); menuAway = 0; ClickWatch.Arm(); }   // just opened
                 menuAway = near ? 0 : menuAway + 1;
-                string why = ClickWatch.ClickedOutside(menu.PanelContains) ? "click"     // any click that isn't on the menu (his body too)
+                bool clickedOut = ClickWatch.ClickedOutside(menu.PanelContains);
+                if (menu.Dragging) { menuAway = 0; clickedOut = false; }      // dragging a file out of the pocket: stay open
+                string why = menu.Dragging ? null
+                           : clickedOut ? "click"     // any click that isn't on the menu (his body too)
                            : Native.EscDown() ? "esc"
                            : Native.Foreground() != menuFg ? "focus"                     // Alt+Tab / another window came to the front
                            : menuAway > 240 ? "away" : null;                               // cursor wandered off for 4 seconds
@@ -323,6 +382,12 @@ namespace Flippy
             fx.Tick(cur, K, S);
             for (int i = foods.Count - 1; i >= 0; i--) { foods[i].Tick(W); if (foods[i].Gone) foods.RemoveAt(i); }
 
+            // walking: a one-pixel bounce on every step, and a little squash when he turns around
+            bool stepping = (Mode == "walk" || Mode == "chase") && !drag;
+            bobY = stepping && (L.Phase == 1 || L.Phase == 3) ? -S : 0;
+            if (stepping && Dir != lastDir && squashT < 6) squashT = 6;
+            lastDir = Dir;
+
             // squash & stretch
             double tx = 1, ty = 1;
             if (squashT > 0) { double a = squashT / 14.0; tx = 1 + 0.16 * a; ty = 1 - 0.2 * a; }
@@ -333,16 +398,16 @@ namespace Flippy
             if (Tick % 120 == 0) { R.KeepOnTop(); foreach (FoodItem f in foods) f.KeepOnTop(); }
         }
 
-        string lastKey = ""; int lastDX, lastDY;
+        string lastKey = ""; int lastDX, lastDY, lastDir = 1; double bobY;
         public void Draw()
         {
             double gy = (Mode == "fall" || Mode == "swing" || drag) ? ShadowGround() : Y;
             double sx = shake > 0 ? (rng.Next(5) - 2) * S * 0.6 : 0;
-            int dx = (int)(X + sx), dy = (int)Y;
+            int dx = (int)(X + sx), dy = (int)(Y + bobY);
             // skip frames where nothing visible changed, and just move the windows when only his position did
-            string key = L.Key() + "," + (int)(gy - Y) + "," + Math.Round(rot) + "," + Math.Round(sqx * 100) + "," + Math.Round(sqy * 100) + "," + S
-                         + (bub.Ticks > 0 ? bub.Text + (bub.Spinner ? (R.Frame / 6).ToString() : "") : "") + parts.Count;
-            if (parts.Count > 0 || key != lastKey) { R.Draw(L, X + sx, Y, S, rot, sqx, sqy, gy, parts, bub, W.Mon, L.Back); lastKey = key; }
+            string key = L.Key() + "," + (int)(gy - Y - bobY) + "," + Math.Round(rot) + "," + Math.Round(sqx * 100) + "," + Math.Round(sqy * 100) + "," + S
+                         + (bub.Ticks > 0 ? bub.Tag + bub.Text + (bub.Spinner ? (R.Frame / 6).ToString() : "") : "") + parts.Count;
+            if (parts.Count > 0 || key != lastKey) { R.Draw(L, X + sx, Y + bobY, S, rot, sqx, sqy, gy, parts, bub, W.Mon, L.Back); lastKey = key; }
             else { R.Frame++; if (dx != lastDX || dy != lastDY) R.Move(dx - lastDX, dy - lastDY); }
             lastDX = dx; lastDY = dy;
             foreach (FoodItem f in foods) if (!f.Grounded || f.Dragging || f.Age < 3 || f.Left < 1) f.Draw(S);

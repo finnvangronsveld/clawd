@@ -19,6 +19,7 @@ namespace Flippy
     class Bubble
     {
         public string Text = ""; public int Ticks; public bool Spinner; public bool Thought;
+        public string Tag;      // a small coloured label above the text (Claude alerts)
     }
 
     class Renderer
@@ -207,7 +208,16 @@ namespace Flippy
             using (Font ft = new Font(font9.FontFamily, 9f * k, FontStyle.Bold, GraphicsUnit.Pixel))
             {
                 SizeF sz;
-                using (Bitmap tmp = new Bitmap(1, 1)) using (Graphics g = Graphics.FromImage(tmp)) sz = g.MeasureString(bub.Text, ft, (int)(170 * k));
+                using (Bitmap tmp = new Bitmap(1, 1)) using (Graphics g = Graphics.FromImage(tmp))
+                {
+                    sz = g.MeasureString(bub.Text, ft, (int)(170 * k));
+                    if (bub.Tag != null)
+                        using (Font tf = new Font(font9.FontFamily, 7.5f * k, FontStyle.Bold, GraphicsUnit.Pixel))
+                        {
+                            SizeF ts = g.MeasureString(bub.Tag, tf);
+                            sz = new SizeF(Math.Max(sz.Width, ts.Width), sz.Height + ts.Height);
+                        }
+                }
                 float spin = bub.Spinner ? 10 * k : 0;
                 float w = sz.Width + 12 * k + spin, h = sz.Height + 8 * k;
                 float x = head.X - w / 2, y = head.Y - h - 9 * k;
@@ -263,9 +273,17 @@ namespace Flippy
                 textX += 10 * k;
             }
             f.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
+            float textY = r.Top + 4 * k;
+            if (bub.Tag != null)
+                using (Font tf = new Font(font9.FontFamily, 7.5f * k, FontStyle.Bold, GraphicsUnit.Pixel))
+                using (SolidBrush tb = new SolidBrush(Color.FromArgb(214, 112, 76)))
+                {
+                    f.DrawString(bub.Tag, tf, tb, textX, textY);
+                    textY += f.MeasureString(bub.Tag, tf).Height;
+                }
             using (Font ft = new Font(font9.FontFamily, 9f * k, FontStyle.Bold, GraphicsUnit.Pixel))
             using (SolidBrush tb = new SolidBrush(Color.FromArgb(Pal.Ink)))
-                f.DrawString(bub.Text, ft, tb, new RectangleF(textX, r.Top + 4 * k, r.Width - (textX - r.Left) - 4 * k, r.Height));
+                f.DrawString(bub.Text, ft, tb, new RectangleF(textX, textY, r.Width - (textX - r.Left) - 4 * k, r.Bottom - textY));
         }
 
         public void KeepOnTop() { Fx.KeepOnTop(); Body.KeepOnTop(); }

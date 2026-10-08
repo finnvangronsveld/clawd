@@ -9,14 +9,14 @@ using System.Windows.Forms;
 [assembly: AssemblyTitle("Flippy")]
 [assembly: AssemblyProduct("Flippy")]
 [assembly: AssemblyDescription("A little desktop buddy")]
-[assembly: AssemblyVersion("2.4.0.0")]
-[assembly: AssemblyFileVersion("2.4.0.0")]
+[assembly: AssemblyVersion("2.5.0.0")]
+[assembly: AssemblyFileVersion("2.5.0.0")]
 
 namespace Flippy
 {
     static class Program
     {
-        public const string Version = "2.4";
+        public const string Version = "2.5";
         static Pet pet;
         static Settings cfg;
         static Needs needs;
@@ -25,6 +25,19 @@ namespace Flippy
         [STAThread]
         static int Main(string[] args)
         {
+            // started by a Claude Code hook: pass the news on to the running Flippy and quit (never becomes a pet)
+            if (args.Length >= 2 && args[0] == "--notify")
+            {
+                bool t = Array.IndexOf(args, "--test") >= 0;
+                Verbose = Array.IndexOf(args, "--verbose") >= 0; LogFile = t ? "flippy-test.log" : "flippy.log";
+                if (t) { int di0 = Array.IndexOf(args, "--data"); Store.Dir = di0 >= 0 && di0 + 1 < args.Length ? args[di0 + 1] : Path.Combine(Path.GetTempPath(), "FlippyTestData"); }
+                try { return ClaudeHooks.Notify(args[1], t ? "Test" : ""); } catch { return 0; }
+            }
+            if (args.Length >= 2 && args[0] == "--claude-hooks")
+            {
+                try { if (args[1] == "off") ClaudeHooks.Disconnect(); else ClaudeHooks.Connect(Application.ExecutablePath); return 0; }
+                catch (Exception ex) { MessageBox.Show(ex.Message, "Flippy"); return 1; }
+            }
             Native.MakeDpiAware();
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
@@ -54,6 +67,7 @@ namespace Flippy
                 return 0;
             }
             EventWaitHandle poke = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\FlippyPoke" + suffix);
+            EventWaitHandle claude = new EventWaitHandle(false, EventResetMode.AutoReset, ClaudeHooks.EventName(suffix));
             // coming from the old name: settings across, old copy stopped (test runs only migrate a fake --old-data folder)
             int od = Array.IndexOf(args, "--old-data");
             if (test) { if (od >= 0 && od + 1 < args.Length) Migration.CopySettings(Store.Dir, args[od + 1]); }
@@ -96,6 +110,7 @@ namespace Flippy
                     bool stepped = false;
                     while (acc >= step) { pet.Step(); acc -= step; stepped = true; }
                     if (poke.WaitOne(0)) pet.Poked();
+                    if (claude.WaitOne(0)) foreach (string[] a in ClaudeHooks.TakeInbox()) pet.ClaudeAlert(a[0], a[1], a[2]);
                     if (stepped) pet.Draw();
                 }
                 catch (Exception ex) { Log(ex.ToString()); }
@@ -103,7 +118,7 @@ namespace Flippy
             timer.Start();
             Application.ApplicationExit += (s, e) => { try { pet.SaveAll(); } catch { } };
             Application.Run();
-            GC.KeepAlive(mutex);
+            GC.KeepAlive(mutex); GC.KeepAlive(claude);
             return 0;
         }
 

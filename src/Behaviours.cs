@@ -28,7 +28,14 @@ namespace Flippy
         {
             bool free = Free;
 
-            if (dropped != null) { if (free || Mode == "sniff" || Mode == "sleep") { Set("filechew"); } else dropped = null; free = false; }
+            if (dropped != null)
+            {
+                bool busy = Mode == "fall" || Mode == "swing" || Mode == "switch" || Mode == "flip" || Mode == "trick" || Mode == "suitup"
+                            || Mode == "heropose" || Mode == "smash" || Mode == "eat" || Mode == "alert" || Mode == "stash" || drag;
+                if (!busy) { if (suit) { suit = false; Poof(); } Set("stash"); }
+                else { Say("got it, it's in my pocket", 100); dropped = null; }
+                free = false;
+            }
             if (fileHover && (free || Mode == "sleep")) { Set("sniff"); free = false; }
             if (clipPing) { clipPing = false; if (free && cfg.PcReactions && rng.NextDouble() < 0.35 * Math.Max(0.2, cfg.Chatty)) { Set("catch"); free = false; } }
 
@@ -148,7 +155,7 @@ namespace Flippy
                     {
                         double spd = (cfg.Needs && needs.Fullness < 15 ? 0.5 : 0.85) * K;
                         X += spd * Dir; Y = ground; L.Eye = Dir;
-                        if (Tick % 10 == 0) L.Phase = (Tick / 10) % 4; else L.Phase = (Tick / 10) % 4;
+                        L.Phase = (Tick / 10) % 4;
                         if (cfg.Needs && needs.Fullness < 15) L.EyeStyle = "sad";
                         if (cdist < 220 * K) { L.Eye = lookEye; if (lookUp) L.EyeStyle = "up"; if (Chance(400)) Set("idle", 120 + rng.Next(160)); }
                         if (havePlatR && !walkOff)
@@ -326,13 +333,61 @@ namespace Flippy
                     if (t == 1) Chat(Pick(new[] { "ooh, for me?", "is that a file?", "gimme gimme" }), 100);
                     if (!fileHover && dropped == null) Set("idle", 40);
                     break;
-                case "filechew":
+                case "stash":      // you dropped files on him: he catches them, has an opinion, and tucks them in his pocket
                     {
                         Y = ground;
-                        if (t == 1) Say(FileComment(dropped), 150);
-                        L.Mouth = (t / 8) % 2 == 0 ? "chomp" : "chew"; L.EyeStyle = t < 90 ? "happy" : "normal"; L.Arms = "hold";
-                        if (t % 12 == 0 && t < 90) Bit(Sprite.OX + 11, Sprite.OY + 9, (rng.NextDouble() - 0.5) * 0.5, -0.4, 40, Pal.White, 1, 0.03, true);
-                        if (t >= 160) { dropped = null; needs.Fun += 3; Set("idle", 60); }
+                        if (t == 1) { Say(FileComment(dropped), 90); squashT = 10; }
+                        if (t < 70)
+                        {
+                            // holding the paper up, looking at it
+                            L.Arms = "up"; L.EyeStyle = "up"; L.Mouth = "o";
+                            if (t % 10 == 1) Float("paper", Sprite.OX + 11 + Math.Sin(t * 0.3) * 1.2, Sprite.OY - 7, 0, 0, 11, Pal.White);
+                        }
+                        else if (t < 92)
+                        {
+                            // ...and in it goes
+                            L.Arms = "hold"; L.EyeStyle = "happy"; L.Mouth = "smile";
+                            if (t == 70) Float("paper", Sprite.OX + 11, Sprite.OY - 6, 0, 0.32, 22, Pal.White);
+                            if (t == 90) { squashT = 8; for (int i = 0; i < 5; i++) Bit(Sprite.OX + 11, Sprite.OY + 8, (rng.NextDouble() - 0.5) * 0.6, -0.3 - rng.NextDouble() * 0.3, 26, Pal.Spark, 1, 0.03); }
+                        }
+                        else
+                        {
+                            L.EyeStyle = "happy"; L.Mouth = "smile"; L.Arms = t < 130 ? ((t / 10) % 2 == 0 ? "wave1" : "wave2") : "out";
+                            if (t == 92)
+                                Say(stashTooMany ? "only " + Pocket.Max + " fit, I kept the last ones"
+                                    : stashFell > 0 ? "pocket's full, I let the oldest go"
+                                    : "in my pocket! (" + pocket.Files.Count + "/" + Pocket.Max + ")", 120);
+                        }
+                        if (t >= 170) { dropped = null; needs.Fun += 3; Set("idle", 60); }
+                        break;
+                    }
+                case "alert":      // Claude Code is done, or needs you
+                    {
+                        bool ask = aKind == "ask";
+                        Dir = cur.X >= X ? 1 : -1;
+                        if (t == 1)
+                        {
+                            SayTagged(AlertTag(), aText, ask ? 900 : 330);
+                            aJy = 0; aJv = 4.2 * K; squashT = 8;
+                            for (int i = 0; i < 6; i++) Float("star", Sprite.OX + 4 + rng.Next(14), Sprite.OY - 2 - rng.Next(4), (rng.NextDouble() - 0.5) * 0.25, -0.15 - rng.NextDouble() * 0.15, 40, Pal.Spark);
+                        }
+                        // one big hop at the start, and a nudge now and then while Claude waits for you
+                        if (ask && t > 1 && t % 110 == 0 && aJy <= 0) { aJv = 3.0 * K; squashT = 6; }
+                        if (aJy > 0 || aJv > 0) { aJy += aJv; aJv -= G; if (aJy <= 0) { aJy = 0; aJv = 0; squashT = 10; } }
+                        Y = ground - aJy;
+                        if (!ask)
+                        {
+                            L.EyeStyle = "happy"; L.Mouth = "smile";
+                            L.Arms = aJy > 0 ? "up" : t < 160 ? ((t / 10) % 2 == 0 ? "wave1" : "wave2") : "out";
+                            if (t >= 330) Set("idle", 60);
+                        }
+                        else
+                        {
+                            L.EyeStyle = "wide"; L.Mouth = "o"; L.Bang = (t / 15) % 4 != 3;
+                            L.Arms = aJy > 0 ? "up" : ((t / 12) % 2 == 0 ? "wave1" : "wave2");
+                            if (bub.Ticks < 40) bub.Ticks = 40;      // keep the question up until you react
+                            if ((kp > 0 && t > 90) || t > 45 * 60) { bub.Ticks = Math.Min(bub.Ticks, 30); Set("idle", 60); }
+                        }
                         break;
                     }
                 case "catch":      // you copied something: a little paper falls and he catches it

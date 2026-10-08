@@ -51,7 +51,7 @@ namespace Flippy
     {
         // features
         public bool Gun = true, Tricks = true, WebSwing = true, Smash = true, MovieNight = true, PauseTantrum = true,
-                    Commentary = true, TypeAlong = true, Climbing = true, Needs = true, PcReactions = true, Music = true;
+                    Commentary = true, TypeAlong = true, Climbing = true, Needs = true, PcReactions = true, Music = true, ClaudeAlerts = true;
         // sliders
         public double Size = 1.0;        // 0.5 .. 2
         public double Activity = 1.0;    // 0.3 (calm) .. 2 (hyper)
@@ -59,18 +59,18 @@ namespace Flippy
         public string Pet = "phone";     // which pet (species id); unknown ids (e.g. the retired "flippy" blob) fall back to the default
         public event Action Changed;
 
-        static readonly string[] keys = { "Gun", "Tricks", "WebSwing", "Smash", "MovieNight", "PauseTantrum", "Commentary", "TypeAlong", "Climbing", "Needs", "PcReactions", "Music" };
+        static readonly string[] keys = { "Gun", "Tricks", "WebSwing", "Smash", "MovieNight", "PauseTantrum", "Commentary", "TypeAlong", "Climbing", "Needs", "PcReactions", "Music", "ClaudeAlerts" };
         bool Get(string k)
         {
             switch (k) { case "Gun": return Gun; case "Tricks": return Tricks; case "WebSwing": return WebSwing; case "Smash": return Smash; case "MovieNight": return MovieNight;
                 case "PauseTantrum": return PauseTantrum; case "Commentary": return Commentary; case "TypeAlong": return TypeAlong; case "Climbing": return Climbing;
-                case "Needs": return Needs; case "PcReactions": return PcReactions; default: return Music; }
+                case "Needs": return Needs; case "PcReactions": return PcReactions; case "ClaudeAlerts": return ClaudeAlerts; default: return Music; }
         }
         void Set(string k, bool v)
         {
             switch (k) { case "Gun": Gun = v; break; case "Tricks": Tricks = v; break; case "WebSwing": WebSwing = v; break; case "Smash": Smash = v; break;
                 case "MovieNight": MovieNight = v; break; case "PauseTantrum": PauseTantrum = v; break; case "Commentary": Commentary = v; break;
-                case "TypeAlong": TypeAlong = v; break; case "Climbing": Climbing = v; break; case "Needs": Needs = v; break; case "PcReactions": PcReactions = v; break; default: Music = v; break; }
+                case "TypeAlong": TypeAlong = v; break; case "Climbing": Climbing = v; break; case "Needs": Needs = v; break; case "PcReactions": PcReactions = v; break; case "ClaudeAlerts": ClaudeAlerts = v; break; default: Music = v; break; }
         }
         public void Load()
         {
@@ -104,7 +104,7 @@ namespace Flippy
             Form f = new Form();
             f.Text = "Flippy settings"; f.FormBorderStyle = FormBorderStyle.FixedDialog; f.MaximizeBox = false; f.MinimizeBox = false;
             f.StartPosition = FormStartPosition.CenterScreen; f.BackColor = Color.FromArgb(252, 248, 244); f.AutoScaleMode = AutoScaleMode.Dpi;
-            f.Font = new Font("Segoe UI", 9.75f); f.ClientSize = new Size(440, 640); f.ShowIcon = true;
+            f.Font = new Font("Segoe UI", 9.75f); f.ClientSize = new Size(440, 700); f.ShowIcon = true;
             try { f.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
 
             Panel head = new Panel(); head.Dock = DockStyle.Top; head.Height = 64; head.BackColor = Color.FromArgb(SpeciesList.Current.Accent);
@@ -142,6 +142,39 @@ namespace Flippy
                 cb.CheckedChanged += (s, e) => { Set(key, ((CheckBox)s).Checked); Save(); };
                 body.Controls.Add(cb);
             }
+            // Claude Code: he tells you when Claude is done or needs you
+            body.Controls.Add(section("Claude Code"));
+            CheckBox ca = new CheckBox(); ca.Text = "Tell me when Claude is done or has a question"; ca.AutoSize = true; ca.Checked = ClaudeAlerts; ca.Margin = new Padding(2, 2, 0, 2);
+            ca.CheckedChanged += (s, e) => { ClaudeAlerts = ((CheckBox)s).Checked; Save(); };
+            body.Controls.Add(ca);
+            FlowLayoutPanel cl = new FlowLayoutPanel(); cl.AutoSize = true; cl.FlowDirection = FlowDirection.LeftToRight; cl.Margin = new Padding(0, 4, 0, 2);
+            Button conn = new Button(); conn.AutoSize = true; conn.FlatStyle = FlatStyle.System;
+            Label cst = new Label(); cst.AutoSize = true; cst.ForeColor = Color.Gray; cst.Margin = new Padding(8, 7, 0, 0);
+            Action refresh = () =>
+            {
+                bool on = ClaudeHooks.IsConnected();
+                conn.Text = on ? "Disconnect from Claude Code" : "Connect to Claude Code";
+                cst.Text = on ? "connected" : "not connected";
+            };
+            conn.Click += (s, e) =>
+            {
+                try
+                {
+                    if (ClaudeHooks.IsConnected()) ClaudeHooks.Disconnect(); else ClaudeHooks.Connect(Application.ExecutablePath);
+                    refresh();
+                    MessageBox.Show(f, ClaudeHooks.IsConnected()
+                        ? "Done! Claude Code will now tell me when it's finished or needs you.\n\nRestart any open Claude Code sessions so they pick it up."
+                        : "Disconnected. Claude Code won't tell me anything anymore.", "Flippy", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                catch (Exception ex) { MessageBox.Show(f, "Couldn't change " + ClaudeHooks.SettingsPath + ":\n\n" + ex.Message, "Flippy", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+            };
+            refresh();
+            cl.Controls.Add(conn); cl.Controls.Add(cst);
+            body.Controls.Add(cl);
+            Label cnote = new Label(); cnote.AutoSize = true; cnote.MaximumSize = new Size(390, 0); cnote.ForeColor = Color.Gray; cnote.Margin = new Padding(2, 2, 0, 0);
+            cnote.Text = "Adds a few hooks to your Claude Code settings (~/.claude/settings.json; a backup is kept). Works in the terminal and the desktop app's Code tab.";
+            body.Controls.Add(cnote);
+
             body.Controls.Add(section("Personality"));
             body.Controls.Add(Slider("Size", 50, 200, (int)(Size * 100), v => { Size = v / 100.0; Save(); }, "small", "big"));
             body.Controls.Add(Slider("Activity", 30, 200, (int)(Activity * 100), v => { Activity = v / 100.0; Save(); }, "calm", "hyper"));

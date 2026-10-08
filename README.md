@@ -21,7 +21,7 @@ You don't need admin rights or anything else installed: Flippy is a single small
 
 ## Pick your pet
 
-Right-click your pet and choose **Change pet**. The menu switches to a list with a live preview of every pet. Click one, and your current pet does a front flip, there's a poof, and the new one lands in the same spot. You can also choose in **Settings**.
+Right-click your pet and choose **Change pet**. His hologram switches to a list with a live preview of every pet. Click one, and your current pet does a front flip, there's a poof, and the new one lands in the same spot. You can also choose in **Settings**.
 
 - **Flip** (the default): a flip phone with feelings. His face lives on the LCD screen.
 - **Hopper**: a frog who flips.
@@ -30,7 +30,30 @@ Right-click your pet and choose **Change pet**. The menu switches to a list with
 
 Flip, Hopper and Flapjack all do a front flip as their signature move: Flippy is named after Flipforward.
 
-Every pet can do everything below. The menu closes when you pick something, click anywhere else (him included), press Esc, switch windows, or move away. Your choice, settings and his hunger levels are remembered.
+Every pet can do everything below. Your choice, settings and his hunger levels are remembered.
+
+## His menu: a hologram
+
+Right-click him and he projects a hologram above his head: his name and mood bars, a **Play** and a **Tricks** grid of buttons, then **Pocket**, **Change pet**, **Settings...** and **Bye**. It closes when you pick something, click anywhere else (him included), press Esc, switch windows, or move away.
+
+## Claude Code buddy
+
+He tells you when Claude Code needs you:
+
+- **Claude is done:** he hops, waves and says "Claude is done!", with the project name.
+- **Claude has a question** or needs your OK for something: he jumps up and down with a red "!" and shows the question until you click him or start typing.
+
+To turn it on, open **Settings...** and click **Connect to Claude Code**. This adds a few hooks to your Claude Code settings (`~/.claude/settings.json`; a backup is kept), so restart any open Claude Code sessions afterwards. It works in the terminal and in the Claude desktop app's Code tab. Click **Disconnect** to remove it again.
+
+## His pocket
+
+Drop up to **3 files or folders** on him and he keeps them in his pocket (a 4th pushes the oldest out). Get them back from **Pocket** in his menu:
+
+- **click** a file to copy it, then paste it anywhere (Ctrl+V in Explorer, a chat, an email...)
+- **drag** a file out of the hologram onto a folder, the desktop or an app
+- **x** removes it, **Empty the pocket** removes all
+
+He only remembers where the files are; nothing is moved or copied until you take it out.
 
 ## Playing with him
 
@@ -42,10 +65,10 @@ Every pet can do everything below. The menu closes when you pick something, clic
 | **Throw him** | Flies, spins, bounces off the screen edges, and lands dizzy after a big throw. You can land him on a window. |
 | Rub the cursor over him | Blushes and floats hearts |
 | Bring the cursor near | Waves hi |
-| Right-click | Opens his menu at your cursor: his name and mood bars on top, then everything he can do |
+| Right-click | Projects his hologram menu (see above) |
 | **Do your thing!** (menu) | His signature move |
 | **Give him a snack** (menu) | A cookie, pizza, apple or donut drops in. Drag it to him, or he walks over and eats it in three bites. |
-| **Drop a file on him** | Chews on it and has opinions ("a pdf... very official", "I'm NOT running that"). Your file isn't touched. |
+| **Drop a file on him** | Has an opinion ("a pdf... very official", "I'm NOT running that") and tucks it in his pocket |
 | Type | He pulls out his laptop and types along, one hand per key |
 | Pause typing | He thinks: spinner plus "Clauding...", "Percolating..." and so on |
 | Watch a video (YouTube, Netflix, Twitch, VLC, ...) | He picks a seat under it, sits with his back to you in the glow of the screen, eats popcorn and comments |
@@ -103,7 +126,8 @@ Everything stays on your PC:
 - **Typing:** he only counts how many keys went down, never which keys.
 - **Videos:** he checks the title of the window in front to notice a video. He reads playing/paused from Windows' own media controls (the volume-key overlay).
 - **PC reactions:** battery level, CPU load and "something was copied" events. He never reads what you copied.
-- **Dropped files:** he only looks at the file name.
+- **Dropped files:** he only remembers the path (in `%APPDATA%\Flippy\pocket.txt`) and looks at the name. He never opens them.
+- **Claude Code:** the hooks only pass on the project folder name and Claude's short status message (or the question) to him, on your PC.
 - **Menus:** while his menu is open he notices mouse clicks (only where you clicked), so it can close when you click elsewhere.
 - **Saved data:** your settings, chosen pet and his needs are stored only in `%APPDATA%\Flippy`.
 
